@@ -215,7 +215,7 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Read-only week uses a tmp copy of `tests/fixtures/sample_library`.** Files 0444, directory 0555, `FilesystemLibrarySource` plus `FakeDurationIndex` (cartoon 7 min / holiday 60 min fallbacks). Fingerprint and a denied write prove the controller did not create `duration-index.json` or a metadata cache.
 - **Layer A in e2e is the injected calendar plus CH 04 pool.** Event-day multiplier 1.50 on a Halloween-tagged cartoon on 2024-10-31; July gets `wrong_season_weight`. CH 04 wrap and filenames are Halloween movies only. Cartoon channels still refuse other shows’ stems.
 - **Web remote in e2e** uses `create_remote_app` and GET `/`. Assertions are four buttons, four POST routes, Now Playing, and absent catalog paths. T13 remains the detailed remote suite.
-- **Metadata unused** is a `RecordingMetadataSource` that is never passed in. `TelevisionCollaborators` has no metadata field. Playback collaborators stay clock, player, tv_power, library, duration index, settings, holiday calendar, library root, wait.
+- **Metadata unused** is an exact `TelevisionCollaborators` field-name allowlist plus annotation scan. There is no metadata recorder to inject; a source constructed off to the side cannot fail. Playback collaborators stay clock, player, tv_power, library, duration index, settings, holiday calendar, library root, wait, optional logger.
 - **`docs/OPERATIONS.md` is parent-facing.** Hardware checks 1–8 are Pi/TV only. The requirement table maps each README §§2–5 bullet and the three README overrides to a test file or an OPERATIONS manual check.
 
 

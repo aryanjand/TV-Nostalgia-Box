@@ -19,20 +19,20 @@ You need a Raspberry Pi 4, a microSD card, an HDMI cable to the TV, and the offi
 1. Install Raspberry Pi OS Bookworm on the card and boot the Pi once so it can finish first-run setup.
 2. Copy this project onto the Pi.
 3. On the Pi, open a terminal in the project folder and run `setup.sh` as root (`sudo ./setup.sh`). Wait until it prints that setup is complete. The hostname becomes `90stv`. Folders, the TV service, and the maintenance command are installed for you.
-4. Enter maintenance (next section). The box may reboot. After it comes back it should print **maintenance mode**.
-5. Copy your episode files into `/srv/90stv/library`. Keep them in that one folder (no subfolders). Cartoon names look like `LittleBear_S01E04.mp4`. Holiday movies look like `Holiday_Rudolph_CHRISTMAS.mp4`.
-6. Tag, then index (see “Adding episodes” below).
-7. Leave maintenance. The box may reboot again. After that it should be in **tv mode**: power on, no desktop, the stream on the TV.
+4. Enter maintenance with `sudo tv90-maintenance on` (next section). The words **maintenance mode** print *before* any reboot. After the Pi comes back it will not reprint the mode. Run `sudo tv90-maintenance status` and confirm it says `maintenance mode`.
+5. Copy your episode files into `/srv/90stv/library` with `sudo` (or as the `tv90` user). Keep them in that one folder (no subfolders). Cartoon names look like `LittleBear_S01E04.mp4`. Holiday movies look like `Holiday_Rudolph_CHRISTMAS.mp4`.
+6. Tag, then index (see “Adding episodes” below). Those commands also need `sudo` (or the `tv90` user).
+7. Leave maintenance with `sudo tv90-maintenance off`. **tv mode** prints before any reboot; after the Pi comes back it will not reprint the mode. The television should be on: no desktop, the stream on the set. Confirm with `sudo tv90-maintenance status` if you want the printed words.
 
 If the library is still empty, the child should see a calm colored slate, never a desktop or an error dump.
 
 ## How to enter and leave maintenance
 
-On the Pi:
+On the Pi these need administrator rights. `setup.sh` installs the command at `/usr/local/bin/tv90-maintenance`. Put `sudo` in front (or run them as the `tv90` service user). Without that, the household will see permission errors.
 
-- `tv90-maintenance on` — stop the TV, make the library writable, and take the box out of the write-protected TV overlay so you can add files, tag, index, or change settings.
-- `tv90-maintenance off` — put the library back to read-only, turn the write-protected overlay back on, and start the TV again.
-- `tv90-maintenance status` — print the current mode and nothing else.
+- `sudo tv90-maintenance on` — stop the TV, make the library writable, and take the box out of the write-protected TV overlay so you can add files, tag, index, or change settings.
+- `sudo tv90-maintenance off` — put the library back to read-only, turn the write-protected overlay back on, and start the TV again.
+- `sudo tv90-maintenance status` — print the current mode and nothing else.
 
 Both `on` and `off` are safe to run twice. If you are already in that mode, nothing harmful happens.
 
@@ -49,29 +49,29 @@ Lines above the last line are extra notes. Examples:
 - `skip remount: library is not a mount point` — episodes live in the ordinary folder; there is no separate disk yet.
 - `skip overlay: raspi-config is unavailable` — this image cannot flip the write-protect layer; the mode line still tells you where you landed.
 
-If a reboot is required, the Pi prints the mode **first**, then reboots. Wait for it to come back. After `on`, check `tv90-maintenance status` if you are unsure.
+If a reboot is required, the Pi prints the mode **first**, then reboots. It does not print the mode again after it comes back. Wait for the reboot to finish, then run `sudo tv90-maintenance status`.
 
 Wrong usage prints: `usage: tv90-maintenance on|off|status`
 
 ## Adding episodes
 
-Always in maintenance mode.
+Always in maintenance mode. The library folder is owned by the `tv90` user. Copy, tag, and index with `sudo` (or as `tv90`) so you do not get permission errors.
 
-1. Copy the new video files into `/srv/90stv/library`. One flat folder. Use the show names the box already knows: `LittleBear_`, `Oswald_`, `Harry_`, or `Holiday_`. Cartoons need a season and episode number (`S01E04`). Holiday movies need a title and a holiday word (`_HALLOWEEN`, `_THANKSGIVING`, `_CHRISTMAS`, or `_EASTER`).
+1. Copy the new video files into `/srv/90stv/library` (`sudo cp … /srv/90stv/library/`). One flat folder. Use the show names the box already knows: `LittleBear_`, `Oswald_`, `Harry_`, or `Holiday_`. Cartoons need a season and episode number (`S01E04`). Holiday movies need a title and a holiday word (`_HALLOWEEN`, `_THANKSGIVING`, `_CHRISTMAS`, or `_EASTER`).
 2. Dry-run tags (changes nothing). On the Pi:
 
-   `/opt/90stv/venv/bin/python3 -m tv90 tag --library /srv/90stv/library`
+   `sudo /opt/90stv/venv/bin/python3 -m tv90 tag --library /srv/90stv/library`
 
    You should see a table: file, title, proposed tags, and which words triggered them. Files the catalog does not know are listed at the end. Tags already in a filename are left alone.
 3. If the table looks right, apply:
 
-   `/opt/90stv/venv/bin/python3 -m tv90 tag --library /srv/90stv/library --apply`
+   `sudo /opt/90stv/venv/bin/python3 -m tv90 tag --library /srv/90stv/library --apply`
 
 4. Index durations (so the day’s schedule knows how long each file is):
 
-   `/opt/90stv/venv/bin/python3 -m tv90 index --library /srv/90stv/library`
+   `sudo /opt/90stv/venv/bin/python3 -m tv90 index --library /srv/90stv/library`
 
-5. `tv90-maintenance off`. After reboot, the new episode can air when the scheduler picks it. There is no “play this file now” button.
+5. `sudo tv90-maintenance off`. After reboot, the new episode can air when the scheduler picks it. There is no “play this file now” button. Confirm the mode with `sudo tv90-maintenance status` if you want the printed words.
 
 Tagging uses the internet once to fetch titles and descriptions, then remembers them next to the library so a second run does not fetch again. Playback never uses that network.
 
@@ -79,19 +79,19 @@ Tagging uses the internet once to fetch titles and descriptions, then remembers 
 
 Tags come from a word list, not from rewriting the program.
 
-On the Pi the file is:
+On the Pi the file is (use `sudo` to edit; ordinary accounts cannot write it):
 
 `/opt/90stv/venv/lib/python3.11/site-packages/tv90/data/keyword_rules.toml`
 
-If you still have the project folder, the same file is `src/tv90/data/keyword_rules.toml`. Edit one copy. If you edit the project copy, run `setup.sh` again so the Pi’s installed copy matches.
+If you still have the project folder, the same file is `src/tv90/data/keyword_rules.toml`. Edit one copy. If you edit the project copy, run `sudo ./setup.sh` again so the Pi’s installed copy matches.
 
 Each block is a tag and the words that mean that tag (snow → winter, bedtime → night, pumpkin → Halloween, and so on). Words are matched whole, ignoring capitals: `ice` will not tag a title that only contains `nice`.
 
-After you save, enter maintenance if you are not already in it, dry-run `tv90 tag`, then `--apply` if the table is right. Existing filename tags are never overwritten.
+After you save, enter maintenance if you are not already in it (`sudo tv90-maintenance on`), dry-run tag with `sudo` as above, then `--apply` if the table is right. Existing filename tags are never overwritten.
 
 ## Changing settings
 
-These names are the household knobs. Put them on the TV service only while you are in **maintenance mode** (so the change is on the real card, not the throw-away overlay). The file is `/etc/systemd/system/90stv.service`. Add or change an `Environment=` line, then `tv90-maintenance off` so TV mode starts with the new values.
+These names are the household knobs. Put them on the TV service only while you are in **maintenance mode** (so the change is on the real card, not the throw-away overlay). The file is `/etc/systemd/system/90stv.service` (needs `sudo` to edit). Add or change an `Environment=` line, then `sudo tv90-maintenance off` so TV mode starts with the new values.
 
 | What you want | Name | Example | Default |
 | --- | --- | --- | --- |
@@ -130,7 +130,7 @@ Do these after first install, and again after a big library change. A laptop can
 5. **Pull-the-plug.** While something is playing, yank the USB-C power, wait a few seconds, plug it back in. The box returns to live TV for whatever the wall clock says that channel should be airing (mid-episode is correct; starting the file over is wrong). The card is not corrupted. The TV does not show write errors, a desktop, or a stack trace.
 6. **Unplug the network.** Unplug ethernet / turn off Wi-Fi. The TV still plays the local library. The phone remote may disappear until the LAN returns. If the clock was not synced, Now Playing may show `clock not synced`, then retune when time sync comes back.
 7. **Overlay / read-only.** In **tv mode**, create a throw-away file on the system disk (not in the library). Reboot. That file should be gone. Library episodes are still there.
-8. **Maintenance add-one-file.** `tv90-maintenance on`, copy one new tagged episode into `/srv/90stv/library`, dry-run tag, `--apply`, index, `tv90-maintenance off`. After reboot the new episode is eligible to air (confirm with the simulator for today, or wait until that channel picks it).
+8. **Maintenance add-one-file.** `sudo tv90-maintenance on`, copy one new episode into `/srv/90stv/library` with `sudo`, dry-run tag, `--apply`, index (all with `sudo` as above), `sudo tv90-maintenance off`. After reboot the new episode is eligible to air (confirm with the simulator for today, or wait until that channel picks it).
 
 ## Requirement → where verified
 
@@ -140,8 +140,8 @@ README sections 2–5 and the three README overrides. “Test” means automated
 | --- | --- |
 | **§2 Automated provisioning script** (`setup.sh`, packages, hostname `90stv`, folders) | `tests/test_setup_script.py` |
 | **§2 Systemd daemon** (`90stv.service`, restart on failure) | `tests/test_setup_script.py`, `tests/test_main.py`; Manual 1 |
-| **§2 Headless kiosk boot** (no login/desktop/cursor; stream on power) | `tests/test_setup_script.py` (kiosk/unit flags); Manual 1 |
-| **§2 Internet for operations, never for content** | `tests/test_end_to_end.py` (no metadata during playback), `tests/test_television.py`; Manual 6 |
+| **§2 Headless kiosk boot** (no login/desktop/cursor; stream on power) | `setup.sh` (multi-user target, display managers disabled); Manual 1 |
+| **§2 Internet for operations, never for content** | `tests/test_television.py` (controller does not import metadata), `tests/test_setup_script.py` (no outbound firewall; NTP enabled); Manual 6 |
 | **§2 Fail-soft, never a computer** (missing/corrupt file, empty library, HDMI flap → slate, skip, keep ticking) | `tests/test_television.py`, `tests/test_end_to_end.py` (yank mid-week); Manual 1, 5 |
 | **§2 Read-only runtime** (overlay, write-protected boot) | `tests/test_setup_script.py`, `tests/test_maintenance.py`; Manual 7 |
 | **§2 Library partition** (episodes on their own mount, read-only in TV mode) | `tests/test_setup_script.py` (fstab stub); Manual 7, 8 |
@@ -165,9 +165,9 @@ README sections 2–5 and the three README overrides. “Test” means automated
 | **§4 Station sign-on / sign-off** | `tests/test_broadcast_day.py`, `tests/test_television.py`, `tests/test_end_to_end.py`; Manual 4 |
 | **§5 LAN-only Flask remote** (`http://90stv.local:5000`, four buttons, Now Playing) | `tests/test_remote.py`, `tests/test_end_to_end.py`; Manual 2 |
 | **§5 No physical toddler remote** | Design + Manual 2 (parent phone only) |
-| **§5 Input debouncing (500 ms)** | `tests/test_television.py`, `tests/test_remote.py` |
+| **§5 Input debouncing (500 ms)** | `tests/test_television.py` |
 | **§5 Hardware audio ceiling** | `tests/test_television.py`, `tests/test_config.py`; Manual 3 |
 | **§5 HDMI-CEC sleep scheduling** | `tests/test_tv_power.py`, `tests/test_television.py`; Manual 4 |
-| **Override 1 — Internet allowed, never for content** | `tests/test_end_to_end.py`, `tests/test_setup_script.py` (no outbound firewall; NTP enabled); Manual 6 |
+| **Override 1 — Internet allowed, never for content** | `tests/test_setup_script.py` (no outbound firewall; NTP enabled), `tests/test_television.py` (controller does not import metadata); Manual 6 |
 | **Override 2 — Survive a pulled plug** | `tests/test_end_to_end.py` (no runtime writes), `tests/test_setup_script.py`, `tests/test_maintenance.py`; Manual 5, 7 |
 | **Override 3 — Episode tags generated by a tool** | `tests/test_tagging.py`, `tests/test_keyword_tags.py`, `tests/test_cli.py`; Manual 8 |
