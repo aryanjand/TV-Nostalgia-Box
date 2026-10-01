@@ -1,0 +1,349 @@
+"""mpv JSON IPC player. Tests inject a sender; this module never starts mpv."""
+
+from __future__ import annotations
+
+import json
+import socket
+import subprocess
+from collections.abc import Callable, Mapping
+
+from tv90.config import CALM_SLATE_COLOR, Settings
+from tv90.ports.player import (
+    format_channel_banner,
+    format_volume_bar,
+    require_player_volume,
+)
+
+MpvIpcCommandSender = Callable[[Mapping[str, object]], Mapping[str, object]]
+MpvIpcEventReader = Callable[[], Mapping[str, object] | None]
+
+MPV_BINARY = "mpv"
+MPV_NO_CONFIG_FLAG = "--no-config"
+MPV_NO_RESUME_PLAYBACK_FLAG = "--no-resume-playback"
+MPV_WATCH_LATER_DIRECTORY_FLAG = "--watch-later-directory=/dev/null"
+MPV_CACHE_PAUSE_FLAG = "--cache-pause=no"
+MPV_CACHE_ON_DISK_FLAG = "--cache-on-disk=no"
+MPV_IDLE_FLAG = "--idle=yes"
+MPV_FORCE_WINDOW_FLAG = "--force-window=yes"
+MPV_FULLSCREEN_FLAG = "--fullscreen"
+MPV_OSC_OFF_FLAG = "--osc=no"
+MPV_KEEP_OPEN_OFF_FLAG = "--keep-open=no"
+MPV_INPUT_IPC_SERVER_PREFIX = "--input-ipc-server="
+MPV_OSD_COLOR_PREFIX = "--osd-color="
+MPV_OSD_FONT_PREFIX = "--osd-font="
+
+OSD_FONT_NAME = "monospace"
+MPV_PERCENT_VOLUME_SCALE = 100.0
+MILLISECONDS_PER_SECOND = 1000
+EOF_OBSERVE_REQUEST_ID = 1
+EOF_REACHED_PROPERTY = "eof-reached"
+PROPERTY_CHANGE_EVENT = "property-change"
+END_FILE_EVENT = "end-file"
+EOF_REASON = "eof"
+
+LOADFILE_COMMAND = "loadfile"
+LOADFILE_REPLACE_FLAG = "replace"
+LOADFILE_START_OPTION = "start"
+LOADFILE_VF_OPTION = "vf"
+LOADFILE_AF_OPTION = "af"
+SET_PROPERTY_COMMAND = "set_property"
+SHOW_TEXT_COMMAND = "show-text"
+STOP_COMMAND = "stop"
+OSD_OVERLAY_COMMAND = "osd-overlay"
+OBSERVE_PROPERTY_COMMAND = "observe_property"
+VOLUME_PROPERTY = "volume"
+OSD_COLOR_PROPERTY = "osd-color"
+OSD_FONT_PROPERTY = "osd-font"
+
+SLATE_OVERLAY_ID = 1
+TUNER_OVERLAY_ID = 2
+OVERLAY_FORMAT_ASS = "ass-events"
+OVERLAY_FORMAT_NONE = "none"
+OVERLAY_WIDTH = 3840
+OVERLAY_HEIGHT = 2160
+BLACK_HEX_COLOR = "#000000"
+HEX_COLOR_PREFIX = "#"
+ASS_COLOR_PREFIX = "&H"
+ASS_COLOR_SUFFIX = "&"
+RED_HEX_SLICE = slice(0, 2)
+GREEN_HEX_SLICE = slice(2, 4)
+BLUE_HEX_SLICE = slice(4, 6)
+VIDEO_FADE_IN_TEMPLATE = "fade=t=in:st=0:d={fade_seconds}"
+AUDIO_FADE_IN_TEMPLATE = "afade=t=in:st=0:d={fade_seconds}"
+IPC_NEWLINE = "\n"
+TEXT_ENCODING = "utf-8"
+SOCKET_RECV_CHUNK_BYTES = 4096
+
+
+class MpvIpcError(Exception):
+    """The injected or unix-socket IPC transport returned an unusable payload."""
+
+
+class MpvIpcPlayer:
+    def __init__(
+        self,
+        settings: Settings,
+        send_command: MpvIpcCommandSender,
+        read_event: MpvIpcEventReader | None = None,
+    ) -> None:
+        self._settings = settings
+        self._send_command = send_command
+        self._read_event = read_event
+        self._playback_ended = False
+        self._send(
+            [
+                OBSERVE_PROPERTY_COMMAND,
+                EOF_OBSERVE_REQUEST_ID,
+                EOF_REACHED_PROPERTY,
+            ]
+        )
+
+    def load(self, filename: str, offset_seconds: float) -> None:
+        self._begin_playback()
+        self._clear_overlays()
+        self._send_loadfile(filename, offset_seconds, {})
+
+    def fade_to_next(self, filename: str, offset_seconds: float) -> None:
+        # Fade-in on the incoming file so T12 is not blocked waiting for fade-out.
+        self._begin_playback()
+        self._clear_overlays()
+        fade_seconds = self._settings.episode_join_fade_seconds
+        self._send_loadfile(
+            filename,
+            offset_seconds,
+            {
+                LOADFILE_VF_OPTION: VIDEO_FADE_IN_TEMPLATE.format(
+                    fade_seconds=fade_seconds
+                ),
+                LOADFILE_AF_OPTION: AUDIO_FADE_IN_TEMPLATE.format(
+                    fade_seconds=fade_seconds
+                ),
+            },
+        )
+
+    def tune_to(self, filename: str, offset_seconds: float) -> None:
+        self._begin_playback()
+        self._clear_overlay(SLATE_OVERLAY_ID)
+        self._send_overlay(
+            TUNER_OVERLAY_ID,
+            _tuner_black_ass(self._settings.tuner_burst_milliseconds),
+        )
+        self._send_loadfile(filename, offset_seconds, {})
+
+    def show_slate(self) -> None:
+        self._begin_playback()
+        self._send([STOP_COMMAND])
+        self._clear_overlay(TUNER_OVERLAY_ID)
+        self._send_overlay(SLATE_OVERLAY_ID, _slate_ass(CALM_SLATE_COLOR))
+
+    def show_channel_banner(self, channel_number: int) -> None:
+        # osd-duration is on the show-text command; this method must not sleep.
+        self._send([SET_PROPERTY_COMMAND, OSD_COLOR_PROPERTY, self._settings.osd_color])
+        self._send([SET_PROPERTY_COMMAND, OSD_FONT_PROPERTY, OSD_FONT_NAME])
+        self._send(
+            [
+                SHOW_TEXT_COMMAND,
+                format_channel_banner(channel_number),
+                _osd_duration_milliseconds(self._settings.osd_banner_seconds),
+            ]
+        )
+
+    def show_volume_bar(self, volume: float) -> None:
+        require_player_volume(volume)
+        self._send([SET_PROPERTY_COMMAND, OSD_COLOR_PROPERTY, self._settings.osd_color])
+        self._send(
+            [
+                SHOW_TEXT_COMMAND,
+                format_volume_bar(volume),
+                _osd_duration_milliseconds(self._settings.osd_banner_seconds),
+            ]
+        )
+
+    def set_volume(self, volume: float) -> None:
+        require_player_volume(volume)
+        self._send(
+            [
+                SET_PROPERTY_COMMAND,
+                VOLUME_PROPERTY,
+                volume * MPV_PERCENT_VOLUME_SCALE,
+            ]
+        )
+
+    def stop(self) -> None:
+        self._begin_playback()
+        self._send([STOP_COMMAND])
+        self._clear_overlays()
+
+    def playback_has_ended(self) -> bool:
+        self._collect_end_events()
+        return self._playback_ended
+
+    def _begin_playback(self) -> None:
+        self._collect_end_events()
+        self._playback_ended = False
+
+    def _collect_end_events(self) -> None:
+        if self._read_event is None:
+            return
+        while True:
+            event = self._read_event()
+            if event is None:
+                return
+            if _event_reports_playback_ended(event):
+                self._playback_ended = True
+
+    def _send_loadfile(
+        self,
+        filename: str,
+        offset_seconds: float,
+        extra_options: Mapping[str, object],
+    ) -> None:
+        options: dict[str, object] = {
+            LOADFILE_START_OPTION: offset_seconds,
+            **extra_options,
+        }
+        self._send([LOADFILE_COMMAND, filename, LOADFILE_REPLACE_FLAG, options])
+
+    def _clear_overlays(self) -> None:
+        self._clear_overlay(SLATE_OVERLAY_ID)
+        self._clear_overlay(TUNER_OVERLAY_ID)
+
+    def _clear_overlay(self, overlay_id: int) -> None:
+        self._send(
+            [
+                OSD_OVERLAY_COMMAND,
+                {
+                    "id": overlay_id,
+                    "format": OVERLAY_FORMAT_NONE,
+                    "data": "",
+                },
+            ]
+        )
+
+    def _send_overlay(self, overlay_id: int, data: str) -> None:
+        self._send(
+            [
+                OSD_OVERLAY_COMMAND,
+                {
+                    "id": overlay_id,
+                    "format": OVERLAY_FORMAT_ASS,
+                    "data": data,
+                },
+            ]
+        )
+
+    def _send(self, command: list[object]) -> Mapping[str, object]:
+        return self._send_command({"command": command})
+
+
+def ass_bgr_from_hex(hex_color: str) -> str:
+    rgb = hex_color.removeprefix(HEX_COLOR_PREFIX)
+    return (
+        f"{ASS_COLOR_PREFIX}{rgb[BLUE_HEX_SLICE]}{rgb[GREEN_HEX_SLICE]}"
+        f"{rgb[RED_HEX_SLICE]}{ASS_COLOR_SUFFIX}"
+    )
+
+
+def mpv_spawn_arguments(socket_path: str, settings: Settings) -> tuple[str, ...]:
+    return (
+        MPV_BINARY,
+        MPV_NO_CONFIG_FLAG,
+        MPV_NO_RESUME_PLAYBACK_FLAG,
+        MPV_WATCH_LATER_DIRECTORY_FLAG,
+        MPV_CACHE_PAUSE_FLAG,
+        MPV_CACHE_ON_DISK_FLAG,
+        f"{MPV_INPUT_IPC_SERVER_PREFIX}{socket_path}",
+        MPV_IDLE_FLAG,
+        MPV_FORCE_WINDOW_FLAG,
+        MPV_FULLSCREEN_FLAG,
+        MPV_OSC_OFF_FLAG,
+        MPV_KEEP_OPEN_OFF_FLAG,
+        f"{MPV_OSD_COLOR_PREFIX}{settings.osd_color}",
+        f"{MPV_OSD_FONT_PREFIX}{OSD_FONT_NAME}",
+    )
+
+
+def spawn_mpv_process(socket_path: str, settings: Settings) -> subprocess.Popen[bytes]:
+    """T15 starts mpv. Tests never call this; development has no mpv binary."""
+    return subprocess.Popen(
+        mpv_spawn_arguments(socket_path, settings),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def unix_socket_command_sender(socket_path: str) -> MpvIpcCommandSender:
+    """T15 collaborator. Tests inject a sender and never open a socket."""
+
+    def send(payload: Mapping[str, object]) -> Mapping[str, object]:
+        return send_mpv_ipc_over_unix_socket(socket_path, payload)
+
+    return send
+
+
+def send_mpv_ipc_over_unix_socket(
+    socket_path: str, payload: Mapping[str, object]
+) -> dict[str, object]:
+    """One request/response on a unix socket. T15 may wrap a persistent session."""
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+        client.connect(socket_path)
+        client.sendall(encode_mpv_ipc_payload(payload))
+        return decode_mpv_ipc_response(_read_socket_line(client))
+
+
+def encode_mpv_ipc_payload(payload: Mapping[str, object]) -> bytes:
+    return (json.dumps(dict(payload)) + IPC_NEWLINE).encode(TEXT_ENCODING)
+
+
+def decode_mpv_ipc_response(raw_line: str) -> dict[str, object]:
+    try:
+        loaded: object = json.loads(raw_line)
+    except json.JSONDecodeError as error:
+        raise MpvIpcError("mpv IPC response is not JSON") from error
+    if not isinstance(loaded, dict):
+        raise MpvIpcError("mpv IPC response is not a JSON object")
+    return loaded
+
+
+def _osd_duration_milliseconds(seconds: float) -> int:
+    return int(seconds * MILLISECONDS_PER_SECOND)
+
+
+def _event_reports_playback_ended(event: Mapping[str, object]) -> bool:
+    name = event.get("event")
+    if name == PROPERTY_CHANGE_EVENT:
+        return event.get("name") == EOF_REACHED_PROPERTY and event.get("data") is True
+    if name == END_FILE_EVENT:
+        return event.get("reason") == EOF_REASON
+    return False
+
+
+def _slate_ass(hex_color: str) -> str:
+    return _ass_rectangle(ass_bgr_from_hex(hex_color), "")
+
+
+def _tuner_black_ass(burst_milliseconds: int) -> str:
+    # ASS \t makes the black field transparent after the burst; no Python sleep.
+    timed = f"\\t(0,{burst_milliseconds},\\1a&HFF&)"
+    return _ass_rectangle(ass_bgr_from_hex(BLACK_HEX_COLOR), timed)
+
+
+def _ass_rectangle(ass_color: str, timed_override: str) -> str:
+    # an7 pins the drawing to the top-left so a 4K rectangle covers 1080p and 4K.
+    return (
+        f"{{\\an7\\p1\\bord0\\shad0\\1c{ass_color}\\1a&H00&{timed_override}}}"
+        f"m 0 0 l {OVERLAY_WIDTH} 0 {OVERLAY_WIDTH} {OVERLAY_HEIGHT} "
+        f"0 {OVERLAY_HEIGHT}"
+    )
+
+
+def _read_socket_line(client: socket.socket) -> str:
+    chunks = bytearray()
+    while IPC_NEWLINE.encode(TEXT_ENCODING) not in chunks:
+        piece = client.recv(SOCKET_RECV_CHUNK_BYTES)
+        if piece == b"":
+            raise MpvIpcError("mpv IPC socket closed")
+        chunks.extend(piece)
+    line, _remainder = bytes(chunks).split(IPC_NEWLINE.encode(TEXT_ENCODING), 1)
+    return line.decode(TEXT_ENCODING)
