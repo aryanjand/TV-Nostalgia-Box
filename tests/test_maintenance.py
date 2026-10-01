@@ -1,6 +1,8 @@
 import io
 from pathlib import Path
 
+import pytest
+
 from tv90.application.maintenance import (
     ARGPARSE_ERROR_EXIT_CODE,
     MAINTENANCE_MODE_LABEL,
@@ -84,6 +86,12 @@ class FakeMaintenanceHost:
         self.calls.append("reboot")
 
 
+class RebootExitsHost(FakeMaintenanceHost):
+    def reboot(self) -> None:
+        self.calls.append("reboot")
+        raise SystemExit(0)
+
+
 class RecordingRunner:
     def __init__(
         self,
@@ -152,11 +160,11 @@ def test_enter_maintenance_stops_disables_remounts_and_reboots() -> None:
     change = enter_maintenance(host)
 
     assert change.mode == MAINTENANCE_MODE_LABEL
+    assert change.reboot_required is True
     assert host.calls == [
         "stop_service",
         "disable_overlay",
         "remount_rw",
-        "reboot",
     ]
 
 
@@ -172,6 +180,7 @@ def test_enter_maintenance_skips_reboot_when_overlay_does_not_need_it() -> None:
     change = enter_maintenance(host)
 
     assert change.mode == MAINTENANCE_MODE_LABEL
+    assert change.reboot_required is False
     assert SKIP_NOT_PI in change.messages
     assert SKIP_NOT_MOUNT in change.messages
     assert "reboot" not in host.calls
@@ -192,11 +201,11 @@ def test_leave_maintenance_remounts_enables_starts_and_reboots() -> None:
     change = leave_maintenance(host)
 
     assert change.mode == TV_MODE_LABEL
+    assert change.reboot_required is True
     assert host.calls == [
         "remount_ro",
         "enable_overlay",
         "start_service",
-        "reboot",
     ]
 
 
@@ -208,6 +217,28 @@ def test_cli_status_prints_current_mode() -> None:
 
     assert exit_code == SUCCESS_EXIT_CODE
     assert stdout.getvalue() == f"{TV_MODE_LABEL}\n"
+
+
+def test_cli_prints_mode_before_reboot() -> None:
+    stdout = io.StringIO()
+    host = RebootExitsHost(service_active=True, overlay_enabled=True)
+
+    with pytest.raises(SystemExit):
+        main(["on"], host, stdout)
+
+    assert stdout.getvalue().splitlines()[-1] == MAINTENANCE_MODE_LABEL
+    assert "reboot" in host.calls
+
+
+def test_cli_prints_tv_mode_before_leave_reboot() -> None:
+    stdout = io.StringIO()
+    host = RebootExitsHost(service_active=False, overlay_enabled=False)
+
+    with pytest.raises(SystemExit):
+        main(["off"], host, stdout)
+
+    assert stdout.getvalue().splitlines()[-1] == TV_MODE_LABEL
+    assert "reboot" in host.calls
 
 
 def test_cli_on_and_off_print_the_mode() -> None:

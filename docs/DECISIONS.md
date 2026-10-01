@@ -204,5 +204,6 @@ Already-made choices. Do not reopen them without a new requirement.
 - **No outbound firewall** in `setup.sh`. timesyncd/NTP is enabled. Avahi uses the hostname `90stv` so `90stv.local` works.
 - **`tv90-maintenance` is application logic plus a bash wrapper.** `enter_maintenance` / `leave_maintenance` take a `MaintenanceHost`. Tests inject a fake; `SystemMaintenanceHost` takes a command runner so tests never call raspi-config, mount, or systemctl. The wrapper (`scripts/tv90-maintenance`, installed to `/usr/local/bin`) execs `python3 -m tv90.application.maintenance`. No `dry_run` flag; `status` is the query.
 - **Mode detection:** TV mode if the service is active **or** the overlay is enabled; otherwise maintenance. `on`/`off` no-op when already in that mode and still print `maintenance mode` or `tv mode`. Overlay disable/enable on a Pi asks raspi-config and reboots when that command succeeds. Laptop: skip overlay and remount (library is not a mount) with a message, do not crash.
+- **Print the mode before reboot.** `enter_maintenance` / `leave_maintenance` return `ModeChange.reboot_required` and do not reboot. `main` writes the mode line, flushes, then calls `reboot`. `systemctl reboot` does not return, so printing after reboot would never show.
 
 

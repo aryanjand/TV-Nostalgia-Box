@@ -71,6 +71,7 @@ class OverlayAction:
 class ModeChange:
     mode: str
     messages: tuple[str, ...]
+    reboot_required: bool = False
 
 
 class MaintenanceHost(Protocol):
@@ -147,26 +148,28 @@ def current_mode(host: MaintenanceHost) -> str:
 
 def enter_maintenance(host: MaintenanceHost) -> ModeChange:
     if current_mode(host) == MAINTENANCE_MODE_LABEL:
-        return ModeChange(MAINTENANCE_MODE_LABEL, ())
+        return ModeChange(MAINTENANCE_MODE_LABEL, (), False)
     host.stop_service()
     overlay = host.disable_overlay()
     remount_message = host.remount_library_writable()
-    if overlay.reboot_required:
-        host.reboot()
     return ModeChange(
-        MAINTENANCE_MODE_LABEL, _messages(overlay.message, remount_message)
+        MAINTENANCE_MODE_LABEL,
+        _messages(overlay.message, remount_message),
+        overlay.reboot_required,
     )
 
 
 def leave_maintenance(host: MaintenanceHost) -> ModeChange:
     if current_mode(host) == TV_MODE_LABEL:
-        return ModeChange(TV_MODE_LABEL, ())
+        return ModeChange(TV_MODE_LABEL, (), False)
     remount_message = host.remount_library_readonly()
     overlay = host.enable_overlay()
     host.start_service()
-    if overlay.reboot_required:
-        host.reboot()
-    return ModeChange(TV_MODE_LABEL, _messages(remount_message, overlay.message))
+    return ModeChange(
+        TV_MODE_LABEL,
+        _messages(remount_message, overlay.message),
+        overlay.reboot_required,
+    )
 
 
 def main(argv: Sequence[str], host: MaintenanceHost, stdout: TextIO) -> int:
@@ -187,6 +190,10 @@ def main(argv: Sequence[str], host: MaintenanceHost, stdout: TextIO) -> int:
     for message in change.messages:
         stdout.write(f"{message}\n")
     stdout.write(f"{change.mode}\n")
+    # systemctl reboot does not return; the mode line must already be on stdout.
+    stdout.flush()
+    if change.reboot_required:
+        host.reboot()
     return SUCCESS_EXIT_CODE
 
 
