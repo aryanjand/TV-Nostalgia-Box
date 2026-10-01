@@ -227,3 +227,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 471 passed, coverage 100%.
 - Commits: `02f6556` date rules; `e99129e` holiday calendar; `8c1de6b` docs.
 - Interface: `load_holiday_calendar(environ, settings)`, `HolidayCalendar.channel_four_open`, `active_holiday`, `layer_a_multiplier`.
+
+### T6
+
+- Status: done. Reviewer APPROVE. Orchestrator `make check`: 482 passed, coverage 100%.
+- Commits: `09cdfed` recency weight; `4ffc90a` docs.
+- Interface: `RecencyWeight(settings).weight(episode, recently_aired_filenames)` chronological oldest-first.
