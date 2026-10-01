@@ -18,7 +18,7 @@ Unlike YouTube or Netflix, this box is not engineered for watch time, click-thro
 * **Cooling:** Passive aluminum heatsink enclosure (e.g., Flirc case) for silent, fan-free operation.
 * **Power Supply:** Official 15W (5.1V / 3.0A) USB-C power supply to prevent undervoltage issues during continuous playback.
 * **Display Output:** Micro-HDMI to Standard HDMI cable connected to a modern television.
-* **Physical Controller:** 2.4GHz USB Wireless Remote / Air Mouse with a dedicated USB receiver dongle.
+* **Controller:** None in the toddler's hands. The only remote is a parent **Wi-Fi web remote** on a phone/tablet already on the home LAN (see §5). No USB air mouse, no extra buttons on the TV stand.
 
 ---
 
@@ -27,16 +27,18 @@ Unlike YouTube or Netflix, this box is not engineered for watch time, click-thro
 * **Automated Provisioning Script:** A single Bash setup script (`setup.sh`) automates system updates, installs dependencies (`mpv`, `flask`, `avahi-daemon`), assigns the hostname (`90stv`), configures local mDNS discovery, and sets up project folders.
 * **Systemd Daemon Service:** The application runs as a background service (`90stv.service`) with `Restart=always` to guarantee immediate startup on power-up and automatic recovery if a process exits unexpectedly.
 * **Headless Kiosk Boot:** The device boots directly into the live television video stream upon receiving power—bypassing user logins, desktop environments, and command-line text to mimic an arcade machine or classic TV set.
-* **Air-Gapped Operation:** The system operates 100% offline from local SD card storage without external internet dependencies.
+* **LAN-only, no WAN (Wi-Fi remote is the exception):** Shows never come from the internet. The library is 100% local on the SD card. The Pi may join **home LAN Wi-Fi only** so a parent can open the web remote. It does not use the WAN: no updates-at-runtime, no streaming, no thumbnails, no “related” fetches, no cloud. Firewall/block outbound if practical. Avahi/mDNS stays on the LAN (`90stv.local`).
+* **Fail-soft, never a computer:** If a file is missing/corrupt, HDMI drops, or the SD library is empty, the child must still see a **calm slate** (soft color field or a still of the current friend) — never a desktop, cursor, login, terminal, or stack trace. Skip a bad file and continue the timeline; if nothing can play, hold the slate until the library is fixed. HDMI flap: wait and resume, do not exit kiosk.
 
 ---
 
 ### 3. Video Playback & Display Interface
 
 * **Rendering Backend:** MPV controlled via Python.
-* **Wall-Clock Live TV Sync:** Each channel airs a **daypart-aware daily timeline** (see §4). Switching channels jumps to the file + timestamp that station is broadcasting *right now* — including morning vs night weighting — not a fresh random draw.
+* **Wall-Clock Live TV Sync:** Each channel airs a **daypart-aware daily timeline** (see §4). Power-on, reboot, and channel-surf all jump to the file + timestamp that station is broadcasting *right now* — including morning vs night weighting — not a fresh random draw, and **not** from the start of the episode. If the theme already aired, they missed it; that is intentional (real cable).
 * **Retro On-Screen Display (OSD):** Styled with a neon-green (`#00FF00`) blocky monospace CRT font displaying channel banners (e.g., `CH 03`) for 3 seconds upon channel changes, alongside horizontal segmented volume bars during audio adjustments.
 * **Channel Tuning Effect:** A brief 150ms static/noise burst or black frame plays during channel changes to simulate analog tuner signal acquisition.
+* **Gentle episode joins (no YouTube cut):** When one file ends and the next on the same channel begins, do **not** hard-cut. Fade audio/video ~1–2 s, or play a short still bumper of the **same friend** (Oswald into Oswald). The message is “we’re still with this friend,” not autoplay-next. Channel changes may still use the short tuner effect above.
 
 ---
 
@@ -53,7 +55,7 @@ The scheduler is how the north star becomes code: **which episode of the current
   | **CH 03** | *Harry and His Bucket Full of Dinosaurs* | Familiar friend + simple pretend-play loop |
   | **CH 04** | Holiday movies | **Ghost channel** — not in the lineup except during a holiday window |
 
-* **Zero Decision Fatigue:** No episode menus, thumbnails, or "Up Next." Default experience is **power on → already playing.** The physical/web remote only changes **channel** and **volume** (adult override, not a library). Channel-up wraps `01 → 02 → 03 → (04 if live) → 01`. The toddler-facing rule remains: TV is on (gentle surprise) or off.
+* **Zero Decision Fatigue:** No episode menus, thumbnails, or "Up Next." Default experience is **power on → already playing.** The parent Wi-Fi remote only changes **channel** and **volume** (adult override, not a library). Channel-up wraps `01 → 02 → 03 → (04 if live) → 01`. The toddler-facing rule remains: TV is on (gentle surprise) or off.
 
 * **Filename Tags, Flat Library:** Single folder. The scheduler parses suffixes:
 
@@ -89,15 +91,19 @@ The scheduler is how the north star becomes code: **which episode of the current
 
 * **Holiday Engine — two layers:**
 
-  * **Layer A — regular channels (lead-up):** Two weeks before a mapped holiday, holiday-tagged *episodes of that show* get a progressive multiplier (~1.25 → 1.50). The three friends stay on CH 01–03; they start “noticing” the holiday.
-  * **Layer B — CH 04 ghost channel:** Exists only inside the window. Closed, familiar movie set for that occasion (repeat the same few titles). Movies stay on CH 04; cartoons stay on 01–03. CH 04 **ignores $W_{\text{time}}$** unless a movie is explicitly daypart-tagged (most are not). **Event days** (Oct 31, Thanksgiving, Dec 24–25, Easter Sunday) max Layer A on CH 01–03 and leave CH 04 as the movie marathon. When the window ends, CH 04 drops out of the wrap; a leftover CH 04 press lands on CH 01.
+  * **Config: constants, overridable by env.** Holiday names, file tags, event-date rules, CH 04 lead-in days, and Layer A cartoon lead-up live in a **constants** table (e.g. `holidays.py` / a `HOLIDAYS` dict). The scheduler only reads that table — it does not hardcode “Oct 31”. **Env vars override constants** without a code edit (enable/disable a holiday, change lead-in, swap a date rule). Missing env → use the constant. Defaults below are the Canadian set.
+
+  * **Layer A — regular channels (lead-up):** Two weeks before a mapped holiday (constant, env-overridable), holiday-tagged *episodes of that show* get a progressive multiplier (~1.25 → 1.50). The three friends stay on CH 01–03; they start “noticing” the holiday.
+  * **Layer B — CH 04 ghost channel:** Exists only inside an **inclusive date range**, not a single night. Closed, familiar movie set for that occasion (repeat the same few titles). Movies stay on CH 04; cartoons stay on 01–03. CH 04 **ignores $W_{\text{time}}$** unless a movie is explicitly daypart-tagged (most are not). The range **opens 2–3 days before** the first event day (constant `HOLIDAY_LEAD_DAYS`, default 3, env override) and **closes at the end of the last event day** — no hangover after. **Event days** max Layer A on CH 01–03 and leave CH 04 as the movie marathon. After the range ends, CH 04 drops from the wrap; a leftover CH 04 press lands on CH 01.
+
+  Default holiday table (constants; env may add, remove, or retune):
 
   | Holiday | Window (CH 04 visible) | Event-day marathon |
   | --- | --- | --- |
-  | Halloween | Oct 18–31 | Oct 31 |
-  | Thanksgiving (US) | Mon of that week → Thursday | Thanksgiving Day |
-  | Christmas | Dec 11 – Dec 26 | Dec 24–25 |
-  | Easter | 14 days before → Easter Sunday | Easter Sunday |
+  | Halloween | Oct 28–29 → Oct 31 (Oct 31 − 2–3 days) | Oct 31 |
+  | Thanksgiving (Canada) | Fri–Sat → second Monday of October (Monday − 2–3 days) | Thanksgiving Monday |
+  | Christmas | Dec 21–22 → Dec 25 (Dec 24 − 2–3 days) | Dec 24–25 |
+  | Easter | Easter − 2–3 days → Easter Sunday | Easter Sunday |
 
 * **Anti-Repeat & Final Weight (per channel):** Same *show* on purpose; not the same *file* twice in an hour. Recency $R$ is per channel: last 3 blocked ($R = 0$), last 10 penalized ($R = 0.15$). For each slot at time $t$:
 
@@ -109,9 +115,9 @@ The scheduler is how the north star becomes code: **which episode of the current
 
 ### 5. Remote Control, Web UI & Safety Controls
 
-* **Smartphone / Tablet Web Remote:** An embedded lightweight Flask/FastAPI web server accessible over home Wi-Fi at `[http://90stv.local:5000](http://90stv.local:5000)` (or local IP). The interface features large touch buttons for `CHANNEL UP`, `CHANNEL DOWN`, `VOLUME UP`, `VOLUME DOWN`, and a "Now Playing" display.
-* **Physical USB Remote Integration:** USB remote inputs map directly to MPV player controls without needing a desktop manager.
-* **Input Debouncing:** Enforces a 500ms command cooldown to ignore rapid toddler button mashing.
+* **Wi-Fi remote only (parent device):** The **only** controller is the embedded Flask/FastAPI page on the home LAN at `http://90stv.local:5000` (or local IP). Large buttons: `CHANNEL UP`, `CHANNEL DOWN`, `VOLUME UP`, `VOLUME DOWN`, and a "Now Playing" line. No episode grid, no search, no thumbnails. Bind to LAN; do not expose to the internet. This is why the Pi has Wi-Fi — **remote only, not content.**
+* **No physical toddler remote:** No USB air mouse / extra IR clicker on the table. Power and HDMI-CEC bedtime are the toddler-facing on/off boundary.
+* **Input Debouncing:** Enforces a 500ms command cooldown on the web remote so repeated taps do not race the player.
 * **Hardware Audio Ceiling:** Hard-codes a maximum audio output limit (e.g., 65% ALSA volume) to protect hardware and child hearing.
 * **HDMI-CEC Sleep Scheduling:** Sends HDMI-CEC commands to turn off/standby the television at the **9:00 PM night lock** and ignores inputs until morning sign-on (e.g., 6:30 AM).
 
