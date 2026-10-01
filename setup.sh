@@ -16,6 +16,10 @@ JOURNALD_SOURCE="${SCRIPT_DIR}/packaging/90stv-volatile.conf"
 JOURNALD_DEST="/etc/systemd/journald.conf.d/90stv-volatile.conf"
 MAINTENANCE_SOURCE="${SCRIPT_DIR}/scripts/tv90-maintenance"
 MAINTENANCE_DEST="/usr/local/bin/tv90-maintenance"
+LIBRARY_RW_SOURCE="${SCRIPT_DIR}/scripts/tv90-apply-library-mount"
+LIBRARY_RW_DEST="/usr/local/bin/tv90-apply-library-mount"
+LIBRARY_RW_UNIT_SOURCE="${SCRIPT_DIR}/packaging/90stv-library-rw.service"
+LIBRARY_RW_UNIT_DEST="/etc/systemd/system/90stv-library-rw.service"
 OVERLAYROOT_LOCAL="/etc/overlayroot.local.conf"
 # recurse=0 keeps /srv/90stv/library remountable; Bookworm default recurse=1 overlays every mount.
 OVERLAYROOT_LINE='overlayroot="tmpfs:recurse=0"'
@@ -156,6 +160,10 @@ ensure_overlayroot_local() {
 
 ensure_maintenance() {
   install -m 755 "${MAINTENANCE_SOURCE}" "${MAINTENANCE_DEST}"
+  install -m 755 "${LIBRARY_RW_SOURCE}" "${LIBRARY_RW_DEST}"
+  install -m 644 "${LIBRARY_RW_UNIT_SOURCE}" "${LIBRARY_RW_UNIT_DEST}"
+  systemctl daemon-reload
+  systemctl enable 90stv-library-rw.service
 }
 
 ensure_overlay() {

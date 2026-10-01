@@ -3,6 +3,12 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 SETUP_SCRIPT = (REPO / "setup.sh").read_text(encoding="utf-8")
 UNIT_FILE = (REPO / "packaging" / "90stv.service").read_text(encoding="utf-8")
+LIBRARY_RW_UNIT = (REPO / "packaging" / "90stv-library-rw.service").read_text(
+    encoding="utf-8"
+)
+APPLY_LIBRARY_MOUNT = (REPO / "scripts" / "tv90-apply-library-mount").read_text(
+    encoding="utf-8"
+)
 JOURNALD_DROPIN = (REPO / "packaging" / "90stv-volatile.conf").read_text(
     encoding="utf-8"
 )
@@ -64,6 +70,8 @@ def test_setup_script_is_idempotent_about_fstab_and_units() -> None:
     assert "/srv/90stv/library" in SETUP_SCRIPT
     assert "90stv.service" in SETUP_SCRIPT
     assert "tv90-maintenance" in SETUP_SCRIPT
+    assert "90stv-library-rw.service" in SETUP_SCRIPT
+    assert "tv90-apply-library-mount" in SETUP_SCRIPT
 
 
 def test_unit_file_restarts_always_and_logs_to_journal() -> None:
@@ -75,3 +83,12 @@ def test_unit_file_restarts_always_and_logs_to_journal() -> None:
     assert "python3 -m tv90.main" in UNIT_FILE
     assert "StandardOutput=file:" not in UNIT_FILE
     assert "StandardError=file:" not in UNIT_FILE
+
+
+def test_library_rw_boot_unit_remounts_when_flag_present() -> None:
+    assert "tv90-apply-library-mount" in LIBRARY_RW_UNIT
+    assert "WantedBy=multi-user.target" in LIBRARY_RW_UNIT
+    assert APPLY_LIBRARY_MOUNT.startswith("#!/usr/bin/env bash")
+    assert "set -euo pipefail" in APPLY_LIBRARY_MOUNT
+    assert ".tv90-maintenance" in APPLY_LIBRARY_MOUNT
+    assert "remount,rw" in APPLY_LIBRARY_MOUNT

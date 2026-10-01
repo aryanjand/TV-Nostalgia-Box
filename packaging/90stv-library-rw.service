@@ -1,0 +1,13 @@
+[Unit]
+Description=Remount 90stv library read-write when the maintenance flag is present
+After=local-fs.target
+Before=90stv.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=TV90_LIBRARY_PATH=/srv/90stv/library
+ExecStart=/usr/local/bin/tv90-apply-library-mount
+
+[Install]
+WantedBy=multi-user.target

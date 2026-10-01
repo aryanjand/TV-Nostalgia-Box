@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Boot helper: if maintenance left a flag on the library partition, remount it rw.
+# Lives on the library mount (recurse=0), so it survives overlay reboot. fstab stays ro.
+set -euo pipefail
+
+LIBRARY="${TV90_LIBRARY_PATH:-/srv/90stv/library}"
+FLAG="${LIBRARY}/.tv90-maintenance"
+
+if [[ -e "${FLAG}" ]] && findmnt --mountpoint "${LIBRARY}" >/dev/null 2>&1; then
+  mount -o remount,rw "${LIBRARY}"
+fi

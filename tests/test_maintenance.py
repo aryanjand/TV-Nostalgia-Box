@@ -5,6 +5,7 @@ import pytest
 
 from tv90.application.maintenance import (
     ARGPARSE_ERROR_EXIT_CODE,
+    MAINTENANCE_FLAG_FILENAME,
     MAINTENANCE_MODE_LABEL,
     SERVICE_UNIT,
     SKIP_NOT_MOUNT,
@@ -39,12 +40,20 @@ class FakeMaintenanceHost:
         *,
         service_active: bool,
         overlay_enabled: bool,
+        service_enabled: bool | None = None,
+        library_writable: bool | None = None,
         reboot_required: bool = True,
         remount_message: str = "",
         overlay_message: str = "",
     ) -> None:
         self.service_active = service_active
         self.overlay_enabled = overlay_enabled
+        self.service_enabled = (
+            service_active if service_enabled is None else service_enabled
+        )
+        self.library_writable = (
+            not overlay_enabled if library_writable is None else library_writable
+        )
         self.reboot_required = reboot_required
         self.remount_message = remount_message
         self.overlay_message = overlay_message
@@ -53,13 +62,21 @@ class FakeMaintenanceHost:
     def is_service_active(self) -> bool:
         return self.service_active
 
-    def stop_service(self) -> None:
-        self.calls.append("stop_service")
-        self.service_active = False
+    def is_service_enabled(self) -> bool:
+        return self.service_enabled
 
-    def start_service(self) -> None:
-        self.calls.append("start_service")
+    def is_library_writable(self) -> bool:
+        return self.library_writable
+
+    def disable_service(self) -> None:
+        self.calls.append("disable_service")
+        self.service_active = False
+        self.service_enabled = False
+
+    def enable_service(self) -> None:
+        self.calls.append("enable_service")
         self.service_active = True
+        self.service_enabled = True
 
     def is_overlay_enabled(self) -> bool:
         return self.overlay_enabled
@@ -76,10 +93,12 @@ class FakeMaintenanceHost:
 
     def remount_library_writable(self) -> str:
         self.calls.append("remount_rw")
+        self.library_writable = True
         return self.remount_message
 
     def remount_library_readonly(self) -> str:
         self.calls.append("remount_ro")
+        self.library_writable = False
         return self.remount_message
 
     def reboot(self) -> None:
@@ -118,10 +137,11 @@ def _host(
     is_pi: bool = True,
     cmdline: str = "",
     mounts: str = "",
+    library_path: Path = DEFAULT_LIBRARY_PATH,
 ) -> SystemMaintenanceHost:
     return SystemMaintenanceHost(
         runner,
-        library_path=DEFAULT_LIBRARY_PATH,
+        library_path=library_path,
         is_pi=is_pi,
         read_cmdline=lambda: cmdline,
         read_mounts=lambda: mounts,
@@ -139,10 +159,39 @@ def test_current_mode_is_tv_when_service_or_overlay_is_on() -> None:
     )
 
 
-def test_current_mode_is_maintenance_when_service_and_overlay_are_off() -> None:
-    host = FakeMaintenanceHost(service_active=False, overlay_enabled=False)
+def test_current_mode_is_tv_when_service_is_still_enabled() -> None:
+    host = FakeMaintenanceHost(
+        service_active=False,
+        service_enabled=True,
+        overlay_enabled=False,
+        library_writable=True,
+    )
+
+    assert current_mode(host) == TV_MODE_LABEL
+
+
+def test_current_mode_is_maintenance_after_overlay_reboot() -> None:
+    host = FakeMaintenanceHost(
+        service_active=False,
+        service_enabled=False,
+        overlay_enabled=False,
+        library_writable=True,
+    )
 
     assert current_mode(host) == MAINTENANCE_MODE_LABEL
+
+
+def test_current_mode_is_tv_when_library_is_still_read_only() -> None:
+    host = FakeMaintenanceHost(
+        service_active=False,
+        service_enabled=False,
+        overlay_enabled=False,
+        library_writable=False,
+    )
+
+    assert current_mode(host) == TV_MODE_LABEL
+    assert enter_maintenance(host).mode == MAINTENANCE_MODE_LABEL
+    assert host.calls[0] == "disable_service"
 
 
 def test_enter_maintenance_is_noop_when_already_there() -> None:
@@ -162,7 +211,7 @@ def test_enter_maintenance_stops_disables_remounts_and_reboots() -> None:
     assert change.mode == MAINTENANCE_MODE_LABEL
     assert change.reboot_required is True
     assert host.calls == [
-        "stop_service",
+        "disable_service",
         "disable_overlay",
         "remount_rw",
     ]
@@ -205,7 +254,7 @@ def test_leave_maintenance_remounts_enables_starts_and_reboots() -> None:
     assert host.calls == [
         "remount_ro",
         "enable_overlay",
-        "start_service",
+        "enable_service",
     ]
 
 
@@ -396,13 +445,37 @@ def test_system_host_service_and_reboot_use_systemctl() -> None:
     host = _host(runner)
 
     assert host.is_service_active() is True
-    host.stop_service()
-    host.start_service()
+    host.disable_service()
+    host.enable_service()
     host.reboot()
 
-    assert ("systemctl", "stop", SERVICE_UNIT) in runner.calls
-    assert ("systemctl", "start", SERVICE_UNIT) in runner.calls
+    assert ("systemctl", "disable", "--now", SERVICE_UNIT) in runner.calls
+    assert ("systemctl", "enable", "--now", SERVICE_UNIT) in runner.calls
     assert ("systemctl", "reboot") in runner.calls
+
+
+def test_system_host_is_service_enabled() -> None:
+    enabled = _host(
+        RecordingRunner(
+            responses={
+                ("systemctl", "is-enabled", "--quiet", SERVICE_UNIT): CommandOutput(
+                    0, "", ""
+                )
+            }
+        )
+    )
+    disabled = _host(
+        RecordingRunner(
+            responses={
+                ("systemctl", "is-enabled", "--quiet", SERVICE_UNIT): CommandOutput(
+                    1, "disabled\n", ""
+                )
+            }
+        )
+    )
+
+    assert enabled.is_service_enabled() is True
+    assert disabled.is_service_enabled() is False
 
 
 def test_system_host_service_inactive_and_oserror_are_not_active() -> None:
@@ -509,6 +582,74 @@ def test_run_maintenance_command_missing_binary_is_not_found() -> None:
     result = run_maintenance_command(("tv90-definitely-missing-binary",))
 
     assert result.returncode == 127
+
+
+def test_system_host_persists_writable_library_with_flag(tmp_path: Path) -> None:
+    runner = RecordingRunner(
+        responses={
+            ("findmnt", "--noheadings", "--mountpoint", str(tmp_path)): CommandOutput(
+                0, f"{tmp_path}\n", ""
+            )
+        }
+    )
+    host = _host(runner, library_path=tmp_path)
+
+    assert host.remount_library_writable() == ""
+    assert (tmp_path / MAINTENANCE_FLAG_FILENAME).is_file()
+    assert host.is_library_writable() is True
+    assert host.remount_library_readonly() == ""
+    assert not (tmp_path / MAINTENANCE_FLAG_FILENAME).exists()
+
+
+def test_system_host_treats_flag_as_writable_even_if_mount_is_ro(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / MAINTENANCE_FLAG_FILENAME).write_text("rw\n", encoding="utf-8")
+    runner = RecordingRunner(
+        responses={
+            ("findmnt", "--noheadings", "--mountpoint", str(tmp_path)): CommandOutput(
+                0, f"{tmp_path}\n", ""
+            ),
+            ("findmnt", "-no", "OPTIONS", str(tmp_path)): CommandOutput(
+                0, "ro,relatime\n", ""
+            ),
+        }
+    )
+    host = _host(runner, library_path=tmp_path)
+
+    assert host.is_library_writable() is True
+
+
+def test_system_host_library_without_mount_counts_as_writable() -> None:
+    runner = RecordingRunner(
+        responses={
+            ("findmnt", "--noheadings", "--mountpoint", str(DEFAULT_LIBRARY_PATH)): (
+                CommandOutput(1, "", "")
+            )
+        }
+    )
+    host = _host(runner)
+
+    assert host.is_library_writable() is True
+
+
+def test_system_host_ro_mount_without_flag_is_not_writable() -> None:
+    runner = RecordingRunner(
+        responses={
+            (
+                "findmnt",
+                "--noheadings",
+                "--mountpoint",
+                str(DEFAULT_LIBRARY_PATH),
+            ): CommandOutput(0, f"{DEFAULT_LIBRARY_PATH}\n", ""),
+            ("findmnt", "-no", "OPTIONS", str(DEFAULT_LIBRARY_PATH)): CommandOutput(
+                0, "ro,noload,nofail\n", ""
+            ),
+        }
+    )
+    host = _host(runner)
+
+    assert host.is_library_writable() is False
 
 
 def test_wrapper_is_strict_bash_and_calls_the_module() -> None:

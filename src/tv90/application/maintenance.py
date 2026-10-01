@@ -47,6 +47,9 @@ ROOT_MOUNT_POINT = "/"
 SKIP_NOT_PI = "skip overlay: not a Raspberry Pi"
 SKIP_RASPI_CONFIG = "skip overlay: raspi-config is unavailable"
 SKIP_NOT_MOUNT = "skip remount: library is not a mount point"
+MAINTENANCE_FLAG_FILENAME = ".tv90-maintenance"
+FINDMNT_OPTIONS_FLAG = "-no"
+FINDMNT_OPTIONS_FIELD = "OPTIONS"
 
 SystemCommandRunner = Callable[[tuple[str, ...]], "CommandOutput"]
 TextReader = Callable[[], str]
@@ -79,12 +82,20 @@ class MaintenanceHost(Protocol):
         """True when 90stv.service is running."""
         ...
 
-    def stop_service(self) -> None:
-        """Stop the TV service. Missing units must not raise."""
+    def is_service_enabled(self) -> bool:
+        """True when 90stv.service is enabled to start at boot."""
         ...
 
-    def start_service(self) -> None:
-        """Start the TV service. Missing units must not raise."""
+    def is_library_writable(self) -> bool:
+        """True when the library is rw, has a persist flag, or is not a mount."""
+        ...
+
+    def disable_service(self) -> None:
+        """Stop the TV service and prevent autostart. Missing units must not raise."""
+        ...
+
+    def enable_service(self) -> None:
+        """Enable and start the TV service. Missing units must not raise."""
         ...
 
     def is_overlay_enabled(self) -> bool:
@@ -100,11 +111,11 @@ class MaintenanceHost(Protocol):
         ...
 
     def remount_library_writable(self) -> str:
-        """Remount the library rw. Return a skip message or empty."""
+        """Remount rw and persist a flag on the library partition."""
         ...
 
     def remount_library_readonly(self) -> str:
-        """Remount the library ro. Return a skip message or empty."""
+        """Remove the persist flag and remount ro."""
         ...
 
     def reboot(self) -> None:
@@ -141,15 +152,21 @@ def overlay_is_active(cmdline: str, mounts: str) -> bool:
 
 
 def current_mode(host: MaintenanceHost) -> str:
-    if host.is_service_active() or host.is_overlay_enabled():
+    if (
+        host.is_service_enabled()
+        or host.is_service_active()
+        or host.is_overlay_enabled()
+    ):
         return TV_MODE_LABEL
-    return MAINTENANCE_MODE_LABEL
+    if host.is_library_writable():
+        return MAINTENANCE_MODE_LABEL
+    return TV_MODE_LABEL
 
 
 def enter_maintenance(host: MaintenanceHost) -> ModeChange:
     if current_mode(host) == MAINTENANCE_MODE_LABEL:
         return ModeChange(MAINTENANCE_MODE_LABEL, (), False)
-    host.stop_service()
+    host.disable_service()
     overlay = host.disable_overlay()
     remount_message = host.remount_library_writable()
     return ModeChange(
@@ -164,7 +181,7 @@ def leave_maintenance(host: MaintenanceHost) -> ModeChange:
         return ModeChange(TV_MODE_LABEL, (), False)
     remount_message = host.remount_library_readonly()
     overlay = host.enable_overlay()
-    host.start_service()
+    host.enable_service()
     return ModeChange(
         TV_MODE_LABEL,
         _messages(remount_message, overlay.message),
@@ -221,11 +238,33 @@ class SystemMaintenanceHost:
         result = self._run((SYSTEMCTL, "is-active", "--quiet", SERVICE_UNIT))
         return result.returncode == 0
 
-    def stop_service(self) -> None:
-        self._run((SYSTEMCTL, "stop", SERVICE_UNIT))
+    def is_service_enabled(self) -> bool:
+        result = self._run((SYSTEMCTL, "is-enabled", "--quiet", SERVICE_UNIT))
+        return result.returncode == 0
 
-    def start_service(self) -> None:
-        self._run((SYSTEMCTL, "start", SERVICE_UNIT))
+    def is_library_writable(self) -> bool:
+        if self._flag_path().is_file():
+            return True
+        if not self._library_is_mount():
+            return True
+        result = self._run(
+            (
+                FINDMNT,
+                FINDMNT_OPTIONS_FLAG,
+                FINDMNT_OPTIONS_FIELD,
+                str(self._library_path),
+            )
+        )
+        options = [
+            part.strip() for part in result.stdout.replace("\n", "").split(",") if part
+        ]
+        return "rw" in options
+
+    def disable_service(self) -> None:
+        self._run((SYSTEMCTL, "disable", "--now", SERVICE_UNIT))
+
+    def enable_service(self) -> None:
+        self._run((SYSTEMCTL, "enable", "--now", SERVICE_UNIT))
 
     def is_overlay_enabled(self) -> bool:
         if overlay_is_active(self._read_cmdline(), self._read_mounts()):
@@ -243,9 +282,14 @@ class SystemMaintenanceHost:
         return self._set_overlay(enable=True)
 
     def remount_library_writable(self) -> str:
-        return self._remount("rw")
+        message = self._remount("rw")
+        if message:
+            return message
+        self._write_flag()
+        return ""
 
     def remount_library_readonly(self) -> str:
+        self._remove_flag()
         return self._remount("ro")
 
     def reboot(self) -> None:
@@ -272,6 +316,21 @@ class SystemMaintenanceHost:
     def _raspi_config_available(self) -> bool:
         result = self._run((RASPI_CONFIG, NONINT, GET_OVERLAY_NOW))
         return result.returncode != COMMAND_NOT_FOUND
+
+    def _flag_path(self) -> Path:
+        return self._library_path / MAINTENANCE_FLAG_FILENAME
+
+    def _write_flag(self) -> None:
+        try:
+            self._flag_path().write_text("rw\n", encoding="utf-8")
+        except OSError:
+            return
+
+    def _remove_flag(self) -> None:
+        try:
+            self._flag_path().unlink()
+        except OSError:
+            return
 
     def _library_is_mount(self) -> bool:
         result = self._run(
