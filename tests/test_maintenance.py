@@ -17,6 +17,7 @@ from tv90.application.maintenance import (
     OverlayAction,
     SystemCommandRunner,
     SystemMaintenanceHost,
+    apply_persisted_maintenance,
     build_production_host,
     current_mode,
     detect_raspberry_pi,
@@ -42,6 +43,7 @@ class FakeMaintenanceHost:
         overlay_enabled: bool,
         service_enabled: bool | None = None,
         library_writable: bool | None = None,
+        maintenance_flag: bool = False,
         reboot_required: bool = True,
         remount_message: str = "",
         overlay_message: str = "",
@@ -54,6 +56,7 @@ class FakeMaintenanceHost:
         self.library_writable = (
             not overlay_enabled if library_writable is None else library_writable
         )
+        self.maintenance_flag = maintenance_flag
         self.reboot_required = reboot_required
         self.remount_message = remount_message
         self.overlay_message = overlay_message
@@ -67,6 +70,13 @@ class FakeMaintenanceHost:
 
     def is_library_writable(self) -> bool:
         return self.library_writable
+
+    def is_maintenance_flag_present(self) -> bool:
+        return self.maintenance_flag
+
+    def retry_disable_bootro(self) -> str:
+        self.calls.append("retry_disable_bootro")
+        return ""
 
     def disable_service(self) -> None:
         self.calls.append("disable_service")
@@ -94,11 +104,13 @@ class FakeMaintenanceHost:
     def remount_library_writable(self) -> str:
         self.calls.append("remount_rw")
         self.library_writable = True
+        self.maintenance_flag = True
         return self.remount_message
 
     def remount_library_readonly(self) -> str:
         self.calls.append("remount_ro")
         self.library_writable = False
+        self.maintenance_flag = False
         return self.remount_message
 
     def reboot(self) -> None:
@@ -159,26 +171,44 @@ def test_current_mode_is_tv_when_service_or_overlay_is_on() -> None:
     )
 
 
-def test_current_mode_is_tv_when_service_is_still_enabled() -> None:
+def test_current_mode_is_tv_when_service_is_enabled_without_flag() -> None:
     host = FakeMaintenanceHost(
         service_active=False,
         service_enabled=True,
         overlay_enabled=False,
         library_writable=True,
+        maintenance_flag=False,
     )
 
     assert current_mode(host) == TV_MODE_LABEL
 
 
-def test_current_mode_is_maintenance_after_overlay_reboot() -> None:
+def test_current_mode_is_maintenance_when_flag_survives_overlay_discard() -> None:
+    # disable --now ran on tmpfs /etc and is gone; lower-root unit is still enabled.
     host = FakeMaintenanceHost(
         service_active=False,
-        service_enabled=False,
+        service_enabled=True,
         overlay_enabled=False,
         library_writable=True,
+        maintenance_flag=True,
     )
 
     assert current_mode(host) == MAINTENANCE_MODE_LABEL
+    change = enter_maintenance(host)
+    assert change.mode == MAINTENANCE_MODE_LABEL
+    assert host.calls == []
+
+
+def test_current_mode_overlay_wins_over_maintenance_flag() -> None:
+    host = FakeMaintenanceHost(
+        service_active=True,
+        service_enabled=True,
+        overlay_enabled=True,
+        library_writable=True,
+        maintenance_flag=True,
+    )
+
+    assert current_mode(host) == TV_MODE_LABEL
 
 
 def test_current_mode_is_tv_when_library_is_still_read_only() -> None:
@@ -242,6 +272,41 @@ def test_leave_maintenance_is_noop_when_already_tv() -> None:
 
     assert change.mode == TV_MODE_LABEL
     assert host.calls == []
+
+
+def test_apply_persisted_maintenance_disables_service_on_real_root() -> None:
+    host = FakeMaintenanceHost(
+        service_active=False,
+        service_enabled=True,
+        overlay_enabled=False,
+        maintenance_flag=True,
+    )
+
+    change = apply_persisted_maintenance(host)
+
+    assert change.mode == MAINTENANCE_MODE_LABEL
+    assert host.calls == [
+        "remount_rw",
+        "disable_service",
+        "retry_disable_bootro",
+    ]
+    assert host.service_enabled is False
+
+
+def test_apply_persisted_maintenance_does_not_fight_off() -> None:
+    host = FakeMaintenanceHost(
+        service_active=True,
+        service_enabled=True,
+        overlay_enabled=False,
+        maintenance_flag=False,
+        library_writable=False,
+    )
+
+    change = apply_persisted_maintenance(host)
+
+    assert change.mode == TV_MODE_LABEL
+    assert host.calls == []
+    assert host.service_enabled is True
 
 
 def test_leave_maintenance_remounts_enables_starts_and_reboots() -> None:
@@ -599,6 +664,45 @@ def test_system_host_persists_writable_library_with_flag(tmp_path: Path) -> None
     assert host.is_library_writable() is True
     assert host.remount_library_readonly() == ""
     assert not (tmp_path / MAINTENANCE_FLAG_FILENAME).exists()
+
+
+def test_system_host_retry_disable_bootro_after_overlay_is_off() -> None:
+    runner = RecordingRunner(
+        responses={
+            ("raspi-config", "nonint", "disable_bootro"): CommandOutput(0, "", ""),
+        }
+    )
+    host = _host(runner, is_pi=True, cmdline="console=tty1")
+
+    assert host.retry_disable_bootro() == ""
+    assert ("raspi-config", "nonint", "disable_bootro") in runner.calls
+
+
+def test_system_host_retry_disable_bootro_skips_when_not_a_pi() -> None:
+    runner = RecordingRunner()
+    host = _host(runner, is_pi=False)
+
+    assert host.retry_disable_bootro() == ""
+    assert runner.calls == []
+
+
+def test_system_host_retry_disable_bootro_skips_when_command_fails() -> None:
+    runner = RecordingRunner(
+        responses={
+            ("raspi-config", "nonint", "disable_bootro"): CommandOutput(1, "", "busy"),
+        }
+    )
+    host = _host(runner, is_pi=True)
+
+    assert "skip bootro" in host.retry_disable_bootro()
+
+
+def test_system_host_reports_flag_presence(tmp_path: Path) -> None:
+    host = _host(RecordingRunner(), library_path=tmp_path)
+
+    assert host.is_maintenance_flag_present() is False
+    (tmp_path / MAINTENANCE_FLAG_FILENAME).write_text("rw\n", encoding="utf-8")
+    assert host.is_maintenance_flag_present() is True
 
 
 def test_system_host_treats_flag_as_writable_even_if_mount_is_ro(

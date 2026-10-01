@@ -81,6 +81,7 @@ def test_unit_file_restarts_always_and_logs_to_journal() -> None:
     assert "Environment=TV90_LIBRARY_PATH=/srv/90stv/library" in UNIT_FILE
     assert "StandardOutput=journal" in UNIT_FILE
     assert "python3 -m tv90.main" in UNIT_FILE
+    assert "ConditionPathExists=!/srv/90stv/library/.tv90-maintenance" in UNIT_FILE
     assert "StandardOutput=file:" not in UNIT_FILE
     assert "StandardError=file:" not in UNIT_FILE
 
@@ -92,3 +93,6 @@ def test_library_rw_boot_unit_remounts_when_flag_present() -> None:
     assert "set -euo pipefail" in APPLY_LIBRARY_MOUNT
     assert ".tv90-maintenance" in APPLY_LIBRARY_MOUNT
     assert "remount,rw" in APPLY_LIBRARY_MOUNT
+    assert "disable --now" in APPLY_LIBRARY_MOUNT
+    assert "90stv.service" in APPLY_LIBRARY_MOUNT
+    assert "disable_bootro" in APPLY_LIBRARY_MOUNT

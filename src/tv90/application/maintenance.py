@@ -90,6 +90,14 @@ class MaintenanceHost(Protocol):
         """True when the library is rw, has a persist flag, or is not a mount."""
         ...
 
+    def is_maintenance_flag_present(self) -> bool:
+        """True when .tv90-maintenance exists on the library partition."""
+        ...
+
+    def retry_disable_bootro(self) -> str:
+        """Retry disable_bootro after overlay is off. Skip message or empty."""
+        ...
+
     def disable_service(self) -> None:
         """Stop the TV service and prevent autostart. Missing units must not raise."""
         ...
@@ -152,15 +160,30 @@ def overlay_is_active(cmdline: str, mounts: str) -> bool:
 
 
 def current_mode(host: MaintenanceHost) -> str:
-    if (
-        host.is_service_enabled()
-        or host.is_service_active()
-        or host.is_overlay_enabled()
-    ):
+    if host.is_overlay_enabled():
+        return TV_MODE_LABEL
+    # Flag lives on the library partition; disable --now on overlay /etc does not.
+    if host.is_maintenance_flag_present():
+        return MAINTENANCE_MODE_LABEL
+    if host.is_service_enabled() or host.is_service_active():
         return TV_MODE_LABEL
     if host.is_library_writable():
         return MAINTENANCE_MODE_LABEL
     return TV_MODE_LABEL
+
+
+def apply_persisted_maintenance(host: MaintenanceHost) -> ModeChange:
+    """After overlay is off: remount, disable on the real root, retry bootro."""
+    if not host.is_maintenance_flag_present():
+        return ModeChange(current_mode(host), (), False)
+    remount_message = host.remount_library_writable()
+    host.disable_service()
+    bootro_message = host.retry_disable_bootro()
+    return ModeChange(
+        MAINTENANCE_MODE_LABEL,
+        _messages(remount_message, bootro_message),
+        False,
+    )
 
 
 def enter_maintenance(host: MaintenanceHost) -> ModeChange:
@@ -259,6 +282,17 @@ class SystemMaintenanceHost:
             part.strip() for part in result.stdout.replace("\n", "").split(",") if part
         ]
         return "rw" in options
+
+    def is_maintenance_flag_present(self) -> bool:
+        return self._flag_path().is_file()
+
+    def retry_disable_bootro(self) -> str:
+        if not self._is_pi:
+            return ""
+        result = self._run((RASPI_CONFIG, NONINT, DISABLE_BOOTRO))
+        if result.returncode != 0:
+            return "skip bootro: raspi-config disable_bootro is unavailable"
+        return ""
 
     def disable_service(self) -> None:
         self._run((SYSTEMCTL, "disable", "--now", SERVICE_UNIT))

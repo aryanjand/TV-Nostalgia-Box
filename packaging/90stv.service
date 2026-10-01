@@ -2,6 +2,8 @@
 Description=90s Cable TV Nostalgia Box
 After=network-online.target sound.target
 Wants=network-online.target
+# Flag is on the library partition. Overlay discard of /etc cannot hide it.
+ConditionPathExists=!/srv/90stv/library/.tv90-maintenance
 
 [Service]
 Type=simple
