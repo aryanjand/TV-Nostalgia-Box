@@ -22,6 +22,7 @@ from tv90.adapters.fake_player import (
 )
 from tv90.adapters.fake_tv_power import FakeTvPower, PowerOnCommand, StandbyCommand
 from tv90.adapters.filesystem_library import FilesystemLibrarySource
+from tv90.adapters.tvmaze_metadata import METADATA_CACHE_FILENAME
 from tv90.application.simulate import (
     CARTOON_FALLBACK_DURATION_SECONDS,
     HOLIDAY_MOVIE_FALLBACK_DURATION_SECONDS,
@@ -196,9 +197,17 @@ def _make_writable(directory: Path) -> None:
             path.chmod(0o644)
 
 
+def _copy_library(source: Path, dest: Path) -> Path:
+    shutil.copytree(
+        source,
+        dest,
+        ignore=shutil.ignore_patterns(METADATA_CACHE_FILENAME),
+    )
+    return dest
+
+
 def _copy_read_only_library(tmp_path: Path) -> Path:
-    library_dir = tmp_path / "library"
-    shutil.copytree(SAMPLE_LIBRARY, library_dir)
+    library_dir = _copy_library(SAMPLE_LIBRARY, tmp_path / "library")
     _make_read_only(library_dir)
     return library_dir
 
@@ -297,6 +306,18 @@ def _page_text(client: FlaskClient) -> str:
     response = client.get("/")
     assert response.status_code == HTTPStatus.OK
     return response.get_data(as_text=True)
+
+
+def test_e2e_library_copy_skips_leftover_metadata_cache(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "LittleBear_S01E01.mp4").write_bytes(b"")
+    (source / METADATA_CACHE_FILENAME).write_text("{}\n", encoding="utf-8")
+
+    dest = _copy_library(source, tmp_path / "library")
+
+    assert (dest / "LittleBear_S01E01.mp4").is_file()
+    assert not (dest / METADATA_CACHE_FILENAME).exists()
 
 
 def test_july_week_cartoon_channels_dayparts_and_show_isolation(
