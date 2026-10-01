@@ -122,9 +122,9 @@ Run only in maintenance mode.
 | T3 | Time-of-day weight | T1, T2 | done |
 | T4 | Season mapping and season weight | T1, T2 | done |
 | T5 | Holiday calendar: constants table, env overrides, date rules, CH 04 windows, Layer A multiplier | T1, T2 | done |
-| T6 | Recency weight | T1, T2 | in progress |
-| T7 | Combined weight and seeded daily timeline builder with sign-on and night lock | T3, T4, T5, T6 | pending |
-| T8 | Channel lineup with ghost channel and wrap rules; "airing now" resolver (file plus offset) | T5, T7 | pending |
+| T6 | Recency weight | T1, T2 | done |
+| T7 | Combined weight and seeded daily timeline builder with sign-on and night lock | T3, T4, T5, T6 | done |
+| T8 | Channel lineup with ghost channel and wrap rules; "airing now" resolver (file plus offset) | T5, T7 | in progress |
 | T9 | Schedule simulator CLI: `python -m tv90 simulate --date YYYY-MM-DD` | T8 | pending |
 | T10 | `Player` port, fake player, mpv IPC adapter | T1 | pending |
 | T11 | `TvPower` port, fake, cec-client adapter; sleep and sign-on scheduling | T1 | pending |
@@ -233,3 +233,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 482 passed, coverage 100%.
 - Commits: `09cdfed` recency weight; `4ffc90a` docs.
 - Interface: `RecencyWeight(settings).weight(episode, recently_aired_filenames)` chronological oldest-first.
+
+### T7
+
+- Status: done. Reviewer APPROVE. Orchestrator `make check`: 511 passed, coverage 100%.
+- Commits: `5052038` combined weight; `edac4b1` timeline builder; `24bb5ee` docs.
+- Interface: `CombinedWeight`, `DailyTimelineBuilder.build(on_date, channel_number, episode_pool) -> Timeline`, `Slot`, `Timeline`. Hashlib seed `date|channel|hour:.6f`.
