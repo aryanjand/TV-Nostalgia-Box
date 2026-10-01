@@ -27,8 +27,22 @@ Unlike YouTube or Netflix, this box is not engineered for watch time, click-thro
 * **Automated Provisioning Script:** A single Bash setup script (`setup.sh`) automates system updates, installs dependencies (`mpv`, `flask`, `avahi-daemon`), assigns the hostname (`90stv`), configures local mDNS discovery, and sets up project folders.
 * **Systemd Daemon Service:** The application runs as a background service (`90stv.service`) with `Restart=always` to guarantee immediate startup on power-up and automatic recovery if a process exits unexpectedly.
 * **Headless Kiosk Boot:** The device boots directly into the live television video stream upon receiving power—bypassing user logins, desktop environments, and command-line text to mimic an arcade machine or classic TV set.
-* **LAN-only, no WAN (Wi-Fi remote is the exception):** Shows never come from the internet. The library is 100% local on the SD card. The Pi may join **home LAN Wi-Fi only** so a parent can open the web remote. It does not use the WAN: no updates-at-runtime, no streaming, no thumbnails, no “related” fetches, no cloud. Firewall/block outbound if practical. Avahi/mDNS stays on the LAN (`90stv.local`).
+* **Internet for operations, never for content:** Shows never come from the internet. The library is 100% local. Playback never fetches, streams, or depends on anything online. If the internet is down, the TV works exactly the same. The Pi may use the internet for time sync (NTP), for system updates during maintenance, and for fetching episode titles and descriptions during maintenance. Avahi/mDNS stays on the LAN (`90stv.local`). Do not configure an outbound firewall.
 * **Fail-soft, never a computer:** If a file is missing/corrupt, HDMI drops, or the SD library is empty, the child must still see a **calm slate** (soft color field or a still of the current friend) — never a desktop, cursor, login, terminal, or stack trace. Skip a bad file and continue the timeline; if nothing can play, hold the slate until the library is fixed. HDMI flap: wait and resume, do not exit kiosk.
+
+#### Power-cut safety
+
+The box is switched off like a TV: the plug is pulled, with no shutdown sequence.
+
+* **Read-only runtime:** Overlay filesystem, write-protected boot partition. Runtime writes go to memory and disappear at power-off.
+* **Library partition:** Episodes live on their own partition, mounted read-only during normal use.
+* **No disk writes while the TV service runs:** The application writes nothing to disk — no play history, no caches, no state files, no log files. Logs go to the journal, memory-only (`Storage=volatile`). mpv must not write watch-later or cache files.
+* **Maintenance mode** via `tv90-maintenance on|off`:
+  * `on` stops the TV service, disables the overlay, remounts the library writable, and reboots if required.
+  * `off` reverses it.
+  * Both directions are idempotent and print plainly which mode the box is in.
+  * Adding episodes, tagging, indexing durations, and system updates happen in maintenance mode.
+* **Trusted clock before tuning in:** The Pi has no battery clock. On start, hold the calm slate until the clock is trusted (network time synchronised). If still untrusted after a configurable timeout (default 3 minutes), begin playback using the system's best-known time so the child is not left with a blank slate, show "clock not synced" on the web remote's now-playing line, and re-tune to the correct airing as soon as sync arrives.
 
 ---
 
@@ -64,6 +78,7 @@ The scheduler is how the north star becomes code: **which episode of the current
   * Season: `_SPRING`, `_SUMMER`, `_AUTUMN`, `_WINTER` (omit = season-evergreen).
   * Holiday: `_HALLOWEEN`, `_THANKSGIVING`, `_CHRISTMAS`, `_EASTER`.
   * Example: `LittleBear_S01E04_MORNING_WINTER.mp4`, `Oswald_S01E09_NIGHT.mp4`, `Holiday_Rudolph_CHRISTMAS.mp4`.
+  * Tags are assigned by `python -m tv90 tag` (see §6), not by hand.
 
 * **Per-Channel Daily Timeline (live TV, time-varying weights):** Because each cartoon channel **is** one show, the engine never picks a series. At local midnight (or first boot), it **walks the broadcast day in order** and fills slots so 8:00 AM draws morning-biased, midday is a **fair lottery among general episodes**, and evening draws night-biased until the 9:00 PM lock:
 
@@ -115,10 +130,36 @@ The scheduler is how the north star becomes code: **which episode of the current
 
 ### 5. Remote Control, Web UI & Safety Controls
 
-* **Wi-Fi remote only (parent device):** The **only** controller is the embedded Flask/FastAPI page on the home LAN at `http://90stv.local:5000` (or local IP). Large buttons: `CHANNEL UP`, `CHANNEL DOWN`, `VOLUME UP`, `VOLUME DOWN`, and a "Now Playing" line. No episode grid, no search, no thumbnails. Bind to LAN; do not expose to the internet. This is why the Pi has Wi-Fi — **remote only, not content.**
+* **LAN-only Flask remote (parent device):** The **only** controller is the embedded Flask page on the home LAN at `http://90stv.local:5000` (or local IP). Large buttons: `CHANNEL UP`, `CHANNEL DOWN`, `VOLUME UP`, `VOLUME DOWN`, and a "Now Playing" line. No episode grid, no search, no thumbnails. Bind to LAN; do not expose the remote to the internet. Network access on the Pi also supports NTP and maintenance (see §2); it is never used to fetch or stream shows.
 * **No physical toddler remote:** No USB air mouse / extra IR clicker on the table. Power and HDMI-CEC bedtime are the toddler-facing on/off boundary.
 * **Input Debouncing:** Enforces a 500ms command cooldown on the web remote so repeated taps do not race the player.
 * **Hardware Audio Ceiling:** Hard-codes a maximum audio output limit (e.g., 65% ALSA volume) to protect hardware and child hearing.
 * **HDMI-CEC Sleep Scheduling:** Sends HDMI-CEC commands to turn off/standby the television at the **9:00 PM night lock** and ignores inputs until morning sign-on (e.g., 6:30 AM).
+
+---
+
+### 6. Library Maintenance Tools
+
+These tools run only in maintenance mode (`tv90-maintenance on`), on the Pi or a laptop pointed at a folder of episodes.
+
+* **`python -m tv90 tag`** assigns tags by renaming files to the §4 naming scheme. It identifies each episode from show stem and season/episode number, fetches title and description from a free online episode database, and matches keywords to tags.
+  * Dry run is the default: print a plain table of file, title, proposed tags, and keywords that triggered each tag; change nothing.
+  * `--apply` performs the renames.
+  * Tags already present in a filename are the owner's manual choice and are never removed or changed.
+  * No keyword match stays untagged (the scheduler treats the episode as general and season-evergreen).
+  * Episodes whose metadata could not be found are listed at the end.
+  * Keyword rules live in one editable data file, not in code.
+  * Cache fetched metadata next to the library so reruns do not refetch.
+
+  Starting keyword examples (implementation is T14):
+
+  | Keywords | Tag |
+  | --- | --- |
+  | snow, sled, ice | `_WINTER` |
+  | moon, bedtime, sleep, stars | `_NIGHT` |
+  | breakfast, wake, sunrise | `_MORNING` |
+  | pumpkin, costume | `_HALLOWEEN` |
+
+* **`python -m tv90 index`** probes every file's duration with ffprobe and writes the duration index onto the library partition. At runtime the scheduler reads that index; a file missing from it is probed in memory and never written back.
 
 ---
