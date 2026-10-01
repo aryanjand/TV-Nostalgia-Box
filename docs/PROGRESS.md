@@ -239,3 +239,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 511 passed, coverage 100%.
 - Commits: `5052038` combined weight; `edac4b1` timeline builder; `24bb5ee` docs.
 - Interface: `CombinedWeight`, `DailyTimelineBuilder.build(on_date, channel_number, episode_pool) -> Timeline`, `Slot`, `Timeline`. Hashlib seed `date|channel|hour:.6f`.
+
+### T8
+
+- Status: done. Reviewer APPROVE. Orchestrator `make check`: 543 passed, coverage 100%.
+- Commits: `3492ddd` lineup; `d5d77f6` airing now.
+- Interface: `ChannelLineup`, `episodes_for_channel`, `resolve_airing`, `Station`.
