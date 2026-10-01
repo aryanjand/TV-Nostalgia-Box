@@ -269,3 +269,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 674 passed, coverage 99.37%.
 - Commits: `6c24196` controller; `4c0f6b5` docs.
 - Interface: `TelevisionController` tick + channel_up/down volume_up/down now_playing.
+
+### T13
+
+- Status: done. Reviewer APPROVE. Orchestrator `make check`: 694 passed, coverage 99.37%.
+- Commits: `64c5e3b` Flask remote; `b7d216a` docs.
+- Interface: `create_remote_app(controller)`; GET `/` plus four POST actions only.
