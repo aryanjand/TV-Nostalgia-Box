@@ -257,3 +257,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE (round 2). Orchestrator `make check`: 613 passed, coverage 100%.
 - Commits: `4e47724` `92e6824` player; `8caa0ca` `5d5e408` IPC fixes.
 - Interface: `Player`, `FakePlayer`, `MpvIpcPlayer` (persistent session, named osd-overlay, injected wait).
+
+### T11
+
+- Status: done. Reviewer APPROVE. Orchestrator `make check`: 638 passed, coverage 100%.
+- Commits: `b04fbb6` TvPower; `0dc634f` docs.
+- Interface: `TvPower`, `FakeTvPower`, `CecClientTvPower`, `broadcast_day_contains`.
