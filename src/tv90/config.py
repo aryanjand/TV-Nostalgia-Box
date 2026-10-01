@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Environment names. The TV90_ prefix keeps household overrides off the OS namespace.
@@ -17,6 +18,8 @@ CLOCK_TRUST_TIMEOUT_ENVIRONMENT_NAME = "TV90_CLOCK_TRUST_TIMEOUT_SECONDS"
 HOLIDAY_LEAD_DAYS_ENVIRONMENT_NAME = "TV90_HOLIDAY_LEAD_DAYS"
 SIGN_ON_ENVIRONMENT_NAME = "TV90_SIGN_ON"
 NIGHT_LOCK_ENVIRONMENT_NAME = "TV90_NIGHT_LOCK"
+LIBRARY_PATH_ENVIRONMENT_NAME = "TV90_LIBRARY_PATH"
+DEFAULT_LIBRARY_PATH = Path("/srv/90stv/library")
 
 DEFAULT_TIMEZONE_NAME = "America/Vancouver"
 DEFAULT_CLOCK_TRUST_TIMEOUT_SECONDS = 180
@@ -120,6 +123,14 @@ class Settings:
     in_season_weight: float
     evergreen_season_weight: float
     wrong_season_weight: float
+
+
+def load_library_path(environ: Mapping[str, str]) -> Path:
+    """Library mount. Missing or blank TV90_LIBRARY_PATH keeps the Pi default."""
+    raw_value = _optional_stripped(environ, LIBRARY_PATH_ENVIRONMENT_NAME)
+    if raw_value is None or raw_value == "":
+        return DEFAULT_LIBRARY_PATH
+    return Path(raw_value)
 
 
 def load_settings(environ: Mapping[str, str]) -> Settings:

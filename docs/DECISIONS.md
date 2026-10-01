@@ -187,4 +187,14 @@ Already-made choices. Do not reopen them without a new requirement.
 - **`main(..., *, metadata_source=None, media_prober=None)`.** Optional keyword-only collaborators so tests never open sockets or spawn ffprobe. `run()` omits them and the CLI builds TVMaze + ffprobe.
 - **Duration index keys are library basenames.** The prober is given the full path. Probe/corrupt failures are omitted from the JSON and listed after the write; runtime still probe-in-memory for those names. Unrecognized media files are probed too. `index_library_durations` takes an injected writer so application never imports the file adapter.
 
+## T15
+
+- **Library path default: `/srv/90stv/library`.** `TV90_LIBRARY_PATH` overrides. Missing or blank keeps the default. `load_library_path` lives in `config.py` next to the other env readers so the service and maintenance share one name.
+- **ExecStart is `python3 -m tv90.main`.** `python -m tv90` stays the argparse CLI (simulate/tag/index). No `serve` subcommand, so CLI tests and flags stay untouched.
+- **`build_runtime` is the testable factory.** Clock, player, and tv_power are required keyword arguments so a forgotten fake cannot spawn mpv or cec-client. Library, duration index, and wait may be omitted; omitted library/index use the filesystem adapters, omitted wait is `time.sleep`. Production `main()` is thin and calls `build_production_runtime`, which tests never invoke.
+- **Threading: tick loop on the main thread; Flask in a daemon thread named `tv90-remote` with `threaded=True` and `use_reloader=False`.** Two phones can POST at once. SIGTERM/SIGINT set a `threading.Event`; the loop waits on that event for `TICK_INTERVAL_SECONDS` (0.25 s, reused from T12) so shutdown does not sleep a full tick. The Flask thread is daemon so a pull-the-plug or a systemd kill does not wait on Werkzeug. No disk writes on the stop path.
+- **mpv socket is `/run/90stv/mpv.sock`.** systemd `RuntimeDirectory=90stv` creates the tmpfs directory. Spawn uses the existing `mpv_spawn_arguments` / `spawn_mpv_process` / `connect_mpv_unix_socket` helpers; no extra `--vo` flags.
+- **Player and prober wrap basenames.** `LibraryPathPlayer` and `LibraryPathProber` prepend the library root so mpv/ffprobe open real files while the controller, index, and FakePlayer keep basename keys.
+- **Missing `duration-index.json` is `DurationUnknownError`.** `AbsentFileDurationIndex` wraps `FileDurationIndex` so first boot before `tv90 index` probes in memory instead of raising `DurationIndexUnreadableError` and slating the whole morning. Corrupt JSON still raises.
+
 

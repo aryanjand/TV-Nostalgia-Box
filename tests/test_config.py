@@ -1,4 +1,5 @@
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -17,6 +18,7 @@ from tv90.config import (
     SUMMER_MONTHS,
     WINTER_MONTHS,
     InvalidSettingsError,
+    load_library_path,
     load_settings,
 )
 
@@ -204,3 +206,17 @@ def test_season_month_ranges_are_meteorological() -> None:
     assert SUMMER_MONTHS == (6, 7, 8)
     assert AUTUMN_MONTHS == (9, 10, 11)
     assert WINTER_MONTHS == (12, 1, 2)
+
+
+def test_load_library_path_defaults_to_srv_mount() -> None:
+    assert load_library_path({}) == Path("/srv/90stv/library")
+
+
+def test_load_library_path_treats_blank_as_default() -> None:
+    assert load_library_path({"TV90_LIBRARY_PATH": "  "}) == Path("/srv/90stv/library")
+
+
+def test_load_library_path_uses_override() -> None:
+    assert load_library_path({"TV90_LIBRARY_PATH": "/mnt/cartoons"}) == Path(
+        "/mnt/cartoons"
+    )
