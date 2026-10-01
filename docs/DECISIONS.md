@@ -62,3 +62,11 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Public API:** `TimeOfDayWeight(settings).weight(episode, clock_hour) -> float`. No shared `WeightFactor` protocol; T7 will multiply independent parts.
 - **clock_hour range matches Settings:** `[MINIMUM_CLOCK_HOUR, MAXIMUM_CLOCK_HOUR]` i.e. 0.0 through 24.0 inclusive. 24.0 is midnight as hour 24, not wrapped to 0.0 — the Gaussian is not circular. Non-finite values and hours outside that range raise `InvalidClockHourError`.
 - **CH 04 is not special-cased.** W_time is only `Daypart` and `clock_hour`. A holiday movie with general daypart uses the same piecewise function as an untagged cartoon. T8 owns forcing time weight 1 when a movie has no daypart tag.
+
+## T4
+
+- **Public API:** `month_to_season(month: int) -> SeasonTag` is a plain function (never `EVERGREEN`). `SeasonWeight(settings).weight(episode, month: int) -> float` is the strategy. Month is a calendar-month integer, not a `date` — the scheduler already has the local month, and this factor must not read the clock. No shared `WeightFactor` protocol; T7 will multiply independent parts.
+- **Invalid months raise `InvalidMonthError`.** 0, 13, negatives, and any value outside the four meteorological month tuples. Never None. An evergreen file still validates the month: a bad month is always an error, even though the weight would ignore the calendar season.
+- **Mapping uses the named month tuples** (`SPRING_MONTHS`, `SUMMER_MONTHS`, `AUTUMN_MONTHS`, `WINTER_MONTHS`). Domain code has no 1–12 literals. Weights come from Settings (`in_season_weight`, `evergreen_season_weight`, `wrong_season_weight`), not new magic numbers.
+- **Holiday tags are ignored.** W_season compares `season_tag` to the calendar month only. `M_holiday` is T5. A Christmas-tagged winter cartoon in July is still wrong-season, not boosted.
+- **Simulation:** tests inject `random.Random(1990)` (never the global RNG, never the clock) and draw 20_000 times from a 1:1:1 July pool. Algebraic in-season share from Settings is 0.8; simulated share must land in 0.76–0.84; wrong-season draws must be greater than zero so a zero wrong-season weight cannot hide inside the band.
