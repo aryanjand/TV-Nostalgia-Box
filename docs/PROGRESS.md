@@ -127,9 +127,9 @@ Run only in maintenance mode.
 | T8 | Channel lineup with ghost channel and wrap rules; "airing now" resolver (file plus offset) | T5, T7 | done |
 | T9 | Schedule simulator CLI: `python -m tv90 simulate --date YYYY-MM-DD` | T8 | done |
 | T10 | `Player` port, fake player, mpv IPC adapter | T1 | done |
-| T11 | `TvPower` port, fake, cec-client adapter; sleep and sign-on scheduling | T1 | in progress |
-| T12 | TV controller | T8, T10, T11 | pending |
-| T13 | Flask web remote bound to the LAN | T12 | pending |
+| T11 | `TvPower` port, fake, cec-client adapter; sleep and sign-on scheduling | T1 | done |
+| T12 | TV controller | T8, T10, T11 | done |
+| T13 | Flask web remote bound to the LAN | T12 | in progress |
 | T14 | Maintenance tools: `tv90 tag` and `tv90 index` | T1, T2 | pending |
 | T15 | Composition root, `90stv.service`, `setup.sh`, `tv90-maintenance on\|off` | T12, T13, T14 | pending |
 | T16 | End-to-end tests with fakes; `docs/OPERATIONS.md` | T9, T15 | pending |
@@ -263,3 +263,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 638 passed, coverage 100%.
 - Commits: `b04fbb6` TvPower; `0dc634f` docs.
 - Interface: `TvPower`, `FakeTvPower`, `CecClientTvPower`, `broadcast_day_contains`.
+
+### T12
+
+- Status: done. Reviewer APPROVE. Orchestrator `make check`: 674 passed, coverage 99.37%.
+- Commits: `6c24196` controller; `4c0f6b5` docs.
+- Interface: `TelevisionController` tick + channel_up/down volume_up/down now_playing.
