@@ -47,3 +47,6 @@ secrets/
 .tv90-cache/
 *.metadata.json
 duration-index.json
+
+# Empty dummy files for the simulate CLI sample library (not real media)
+!tests/fixtures/sample_library/*.mp4
