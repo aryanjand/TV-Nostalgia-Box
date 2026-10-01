@@ -1,4 +1,4 @@
-"""TVMaze episode metadata. Tests inject HTTP; this adapter may write a cache file."""
+"""TVMaze episode metadata. Tests inject HTTP; --apply may write a cache file."""
 
 from __future__ import annotations
 
@@ -56,9 +56,12 @@ class EpisodeMetadataFetchError(Exception):
 
 
 class TvmazeEpisodeMetadataSource:
-    def __init__(self, http_get: HttpGetter, cache_path: Path) -> None:
+    def __init__(
+        self, http_get: HttpGetter, cache_path: Path, *, writable: bool = True
+    ) -> None:
         self._http_get = http_get
         self._cache_path = cache_path
+        self._writable = writable
         self._memory: dict[str, ShowCatalog] = {}
 
     def lookup(
@@ -82,7 +85,8 @@ class TvmazeEpisodeMetadataSource:
             self._memory[show_stem] = cached
             return cached
         fetched = self._fetch_show(show_stem)
-        _write_show_to_cache(self._cache_path, show_stem, fetched)
+        if self._writable:
+            _write_show_to_cache(self._cache_path, show_stem, fetched)
         self._memory[show_stem] = fetched
         return fetched
 
@@ -115,8 +119,14 @@ def urlopen_http_get(url: str, headers: HttpHeaders) -> str:
     return bytes(raw).decode(TEXT_ENCODING)
 
 
-def build_tvmaze_metadata_source(cache_path: Path) -> TvmazeEpisodeMetadataSource:
-    return TvmazeEpisodeMetadataSource(urlopen_http_get, cache_path)
+def build_tvmaze_metadata_source(
+    cache_path: Path,
+    *,
+    writable: bool = True,
+    http_get: HttpGetter | None = None,
+) -> TvmazeEpisodeMetadataSource:
+    getter = urlopen_http_get if http_get is None else http_get
+    return TvmazeEpisodeMetadataSource(getter, cache_path, writable=writable)
 
 
 def _tvmaze_headers() -> dict[str, str]:

@@ -38,7 +38,7 @@ from tv90.domain.episode import Episode
 from tv90.domain.holiday_calendar import load_holiday_calendar
 from tv90.domain.keyword_tags import KeywordTagRule
 from tv90.ports.duration import DurationIndex, MediaProber
-from tv90.ports.metadata import EpisodeMetadataSource
+from tv90.ports.metadata import EpisodeMetadataSource, HttpGetter
 
 SIMULATE_COMMAND = "simulate"
 TAG_COMMAND = "tag"
@@ -87,6 +87,7 @@ def main(
     *,
     metadata_source: EpisodeMetadataSource | None = None,
     media_prober: MediaProber | None = None,
+    http_get: HttpGetter | None = None,
 ) -> int:
     parser = _build_parser(stdout)
     try:
@@ -115,11 +116,13 @@ def main(
                     _optional_library_path(args.library),
                     stdout,
                     metadata_source,
+                    http_get,
                 )
             return _run_tag_preview(
                 _optional_library_path(args.library),
                 stdout,
                 metadata_source,
+                http_get,
             )
         except LibraryDirectoryError as error:
             stdout.write(f"{PROGRAM_NAME}: error: {error}\n")
@@ -209,9 +212,10 @@ def _run_tag_preview(
     library_directory: Path | None,
     stdout: TextIO,
     metadata_source: EpisodeMetadataSource | None,
+    http_get: HttpGetter | None,
 ) -> int:
     resolved_library, episodes, source, rules = _tag_inputs(
-        library_directory, metadata_source
+        library_directory, metadata_source, http_get, writable=False
     )
     stdout.write(format_tag_preview(preview_tags(episodes, source, rules)))
     return SUCCESS_EXIT_CODE
@@ -221,9 +225,10 @@ def _run_tag_apply(
     library_directory: Path | None,
     stdout: TextIO,
     metadata_source: EpisodeMetadataSource | None,
+    http_get: HttpGetter | None,
 ) -> int:
     resolved_library, episodes, source, rules = _tag_inputs(
-        library_directory, metadata_source
+        library_directory, metadata_source, http_get, writable=True
     )
     stdout.write(
         format_tag_preview(apply_tags(resolved_library, episodes, source, rules))
@@ -234,6 +239,9 @@ def _run_tag_apply(
 def _tag_inputs(
     library_directory: Path | None,
     metadata_source: EpisodeMetadataSource | None,
+    http_get: HttpGetter | None,
+    *,
+    writable: bool,
 ) -> tuple[
     Path,
     tuple[Episode, ...],
@@ -243,7 +251,9 @@ def _tag_inputs(
     resolved_library = _resolve_library_directory(library_directory)
     library = FilesystemLibrarySource(resolved_library)
     source = metadata_source or build_tvmaze_metadata_source(
-        resolved_library / METADATA_CACHE_FILENAME
+        resolved_library / METADATA_CACHE_FILENAME,
+        writable=writable,
+        http_get=http_get,
     )
     return resolved_library, library.episodes(), source, packaged_keyword_rules()
 

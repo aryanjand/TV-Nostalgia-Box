@@ -153,6 +153,42 @@ def test_corrupt_cache_is_ignored_and_refetched(tmp_path: Path) -> None:
     assert len(http.calls) == 1
 
 
+def test_read_only_source_does_not_write_cache(tmp_path: Path) -> None:
+    cache_path = tmp_path / METADATA_CACHE_FILENAME
+    http = RecordingHttpGetter(LITTLE_BEAR_EPISODES_JSON)
+    source = TvmazeEpisodeMetadataSource(http, cache_path, writable=False)
+
+    metadata = source.lookup(LITTLE_BEAR_SHOW_STEM, 1, 1)
+
+    assert metadata.title == "What Will Little Bear Wear?"
+    assert len(http.calls) == 1
+    assert not cache_path.exists()
+
+
+def test_writable_source_writes_cache_after_fetch(tmp_path: Path) -> None:
+    cache_path = tmp_path / METADATA_CACHE_FILENAME
+    http = RecordingHttpGetter(LITTLE_BEAR_EPISODES_JSON)
+    source = TvmazeEpisodeMetadataSource(http, cache_path, writable=True)
+
+    source.lookup(LITTLE_BEAR_SHOW_STEM, 1, 1)
+
+    assert cache_path.is_file()
+
+
+def test_read_only_source_reads_existing_cache_without_http(tmp_path: Path) -> None:
+    cache_path = tmp_path / METADATA_CACHE_FILENAME
+    warming = TvmazeEpisodeMetadataSource(
+        RecordingHttpGetter(LITTLE_BEAR_EPISODES_JSON), cache_path, writable=True
+    )
+    warming.lookup(LITTLE_BEAR_SHOW_STEM, 1, 1)
+    source = TvmazeEpisodeMetadataSource(_forbidden_http, cache_path, writable=False)
+
+    metadata = source.lookup(LITTLE_BEAR_SHOW_STEM, 1, 2)
+
+    assert metadata.title == "Birthday Soup"
+    assert cache_path.is_file()
+
+
 def test_show_ids_cover_the_three_cartoon_stems() -> None:
     assert set(TVMAZE_SHOW_IDS) == {
         LITTLE_BEAR_SHOW_STEM,

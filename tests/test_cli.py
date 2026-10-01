@@ -1,4 +1,6 @@
 import io
+import json
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -6,13 +8,36 @@ import pytest
 from tv90.adapters.fake_duration import FakeMediaProber
 from tv90.adapters.fake_metadata import FakeEpisodeMetadataSource
 from tv90.adapters.file_duration_index import FileDurationIndex, write_duration_index
+from tv90.adapters.tvmaze_metadata import METADATA_CACHE_FILENAME
 from tv90.interface.cli import main
 from tv90.ports.duration import MediaProber
-from tv90.ports.metadata import EpisodeMetadata, EpisodeMetadataSource
+from tv90.ports.metadata import EpisodeMetadata, EpisodeMetadataSource, HttpGetter
 
 SAMPLE_LIBRARY = Path(__file__).resolve().parent / "fixtures" / "sample_library"
 HALLOWEEN_DATE = "2024-10-31"
 JULY_DATE = "2024-07-15"
+
+
+LITTLE_BEAR_ONE_JSON = json.dumps(
+    [
+        {
+            "name": "What Will Little Bear Wear?",
+            "season": 1,
+            "number": 1,
+            "summary": None,
+        }
+    ]
+)
+
+
+class RecordingHttpGetter:
+    def __init__(self, body: str) -> None:
+        self.body = body
+        self.calls: list[tuple[str, dict[str, str]]] = []
+
+    def __call__(self, url: str, headers: Mapping[str, str]) -> str:
+        self.calls.append((url, dict(headers)))
+        return self.body
 
 
 def _run(
@@ -20,6 +45,7 @@ def _run(
     environ: dict[str, str] | None = None,
     metadata_source: EpisodeMetadataSource | None = None,
     media_prober: MediaProber | None = None,
+    http_get: HttpGetter | None = None,
 ) -> tuple[int, str]:
     stdout = io.StringIO()
     exit_code = main(
@@ -28,6 +54,7 @@ def _run(
         stdout,
         metadata_source=metadata_source,
         media_prober=media_prober,
+        http_get=http_get,
     )
     return exit_code, stdout.getvalue()
 
@@ -128,6 +155,30 @@ def test_cli_missing_library_directory_returns_error(tmp_path: Path) -> None:
 
     assert exit_code != 0
     assert str(missing) in output
+
+
+def test_cli_tag_dry_run_does_not_write_metadata_cache(tmp_path: Path) -> None:
+    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
+    http = RecordingHttpGetter(LITTLE_BEAR_ONE_JSON)
+
+    exit_code, _output = _run(["tag", "--library", str(tmp_path)], http_get=http)
+
+    assert exit_code == 0
+    assert http.calls
+    assert not (tmp_path / METADATA_CACHE_FILENAME).exists()
+
+
+def test_cli_tag_apply_may_write_metadata_cache(tmp_path: Path) -> None:
+    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
+    http = RecordingHttpGetter(LITTLE_BEAR_ONE_JSON)
+
+    exit_code, _output = _run(
+        ["tag", "--apply", "--library", str(tmp_path)], http_get=http
+    )
+
+    assert exit_code == 0
+    assert http.calls
+    assert (tmp_path / METADATA_CACHE_FILENAME).is_file()
 
 
 def test_cli_tag_dry_run_renames_nothing(tmp_path: Path) -> None:
