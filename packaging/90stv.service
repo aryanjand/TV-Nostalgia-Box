@@ -1,0 +1,22 @@
+[Unit]
+Description=90s Cable TV Nostalgia Box
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tv90
+Group=tv90
+SupplementaryGroups=video audio render gpio
+Environment=TV90_LIBRARY_PATH=/srv/90stv/library
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=/srv/90stv
+RuntimeDirectory=90stv
+ExecStart=/opt/90stv/venv/bin/python3 -m tv90.main
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

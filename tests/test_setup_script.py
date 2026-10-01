@@ -1,0 +1,76 @@
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+SETUP_SCRIPT = (REPO / "setup.sh").read_text(encoding="utf-8")
+UNIT_FILE = (REPO / "packaging" / "90stv.service").read_text(encoding="utf-8")
+JOURNALD_DROPIN = (REPO / "packaging" / "90stv-volatile.conf").read_text(
+    encoding="utf-8"
+)
+
+REQUIRED_PACKAGES = ("mpv", "ffmpeg", "cec-utils", "avahi-daemon")
+DEFAULT_DENY_MARKERS = (
+    "iptables -P OUTPUT DROP",
+    "iptables -P OUTPUT DENY",
+    "ufw default deny outgoing",
+    "ufw default deny outbound",
+    "ufw enable",
+)
+
+
+def test_setup_script_uses_strict_bash() -> None:
+    assert SETUP_SCRIPT.startswith("#!/usr/bin/env bash")
+    assert "set -euo pipefail" in SETUP_SCRIPT
+
+
+def test_setup_script_installs_required_packages() -> None:
+    for package in REQUIRED_PACKAGES:
+        assert package in SETUP_SCRIPT
+
+
+def test_setup_script_sets_hostname_90stv() -> None:
+    assert "90stv" in SETUP_SCRIPT
+    assert "hostnamectl" in SETUP_SCRIPT or "hostname" in SETUP_SCRIPT
+
+
+def test_setup_script_does_not_configure_outbound_firewall() -> None:
+    for marker in DEFAULT_DENY_MARKERS:
+        assert marker not in SETUP_SCRIPT
+    assert "ufw " not in SETUP_SCRIPT
+    assert "iptables " not in SETUP_SCRIPT
+
+
+def test_setup_script_enables_timesyncd() -> None:
+    assert "systemd-timesyncd" in SETUP_SCRIPT
+    assert "set-ntp" in SETUP_SCRIPT or "timesyncd" in SETUP_SCRIPT
+
+
+def test_setup_script_installs_volatile_journald() -> None:
+    assert "90stv-volatile.conf" in SETUP_SCRIPT
+    assert "Storage=volatile" in JOURNALD_DROPIN
+    assert "[Journal]" in JOURNALD_DROPIN
+
+
+def test_setup_script_mentions_overlay_and_pi_guard() -> None:
+    assert "overlay" in SETUP_SCRIPT.lower()
+    assert "enable_overlayfs" in SETUP_SCRIPT
+    assert "enable_bootro" in SETUP_SCRIPT
+    assert "Raspberry Pi" in SETUP_SCRIPT
+    assert "/boot/firmware" in SETUP_SCRIPT or "device-tree" in SETUP_SCRIPT
+
+
+def test_setup_script_is_idempotent_about_fstab_and_units() -> None:
+    assert "fstab" in SETUP_SCRIPT
+    assert "ro" in SETUP_SCRIPT
+    assert "/srv/90stv/library" in SETUP_SCRIPT
+    assert "90stv.service" in SETUP_SCRIPT
+
+
+def test_unit_file_restarts_always_and_logs_to_journal() -> None:
+    assert "Restart=always" in UNIT_FILE
+    assert "After=network-online.target sound.target" in UNIT_FILE
+    assert "User=tv90" in UNIT_FILE
+    assert "Environment=TV90_LIBRARY_PATH=/srv/90stv/library" in UNIT_FILE
+    assert "StandardOutput=journal" in UNIT_FILE
+    assert "python3 -m tv90.main" in UNIT_FILE
+    assert "StandardOutput=file:" not in UNIT_FILE
+    assert "StandardError=file:" not in UNIT_FILE

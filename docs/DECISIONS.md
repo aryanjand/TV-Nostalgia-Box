@@ -196,5 +196,11 @@ Already-made choices. Do not reopen them without a new requirement.
 - **mpv socket is `/run/90stv/mpv.sock`.** systemd `RuntimeDirectory=90stv` creates the tmpfs directory. Spawn uses the existing `mpv_spawn_arguments` / `spawn_mpv_process` / `connect_mpv_unix_socket` helpers; no extra `--vo` flags.
 - **Player and prober wrap basenames.** `LibraryPathPlayer` and `LibraryPathProber` prepend the library root so mpv/ffprobe open real files while the controller, index, and FakePlayer keep basename keys.
 - **Missing `duration-index.json` is `DurationUnknownError`.** `AbsentFileDurationIndex` wraps `FileDurationIndex` so first boot before `tv90 index` probes in memory instead of raising `DurationIndexUnreadableError` and slating the whole morning. Corrupt JSON still raises.
+- **systemd user is `tv90`**, a dedicated system account (`nologin`, groups video/audio/render/gpio). Bookworm’s first-boot user is no longer always `pi`, so a named service user stays stable across images.
+- **Kiosk is systemd-only.** `multi-user.target`, display managers disabled when present. No console autologin. The picture is `mpv --force-window --fullscreen` from T10 spawn flags; there is no desktop/cursor fallback.
+- **Overlay method:** on a Raspberry Pi only (`/proc/device-tree/model` contains `Raspberry Pi`; `/boot/firmware` is the Bookworm boot location, not a positive test by itself). Call `raspi-config nonint enable_overlayfs` and `enable_bootro` when those commands exist; otherwise print a skip line. Write `/etc/overlayroot.local.conf` with `overlayroot="tmpfs:recurse=0"` first so Bookworm’s default `recurse=1` does not swallow the library mount. Laptop/CI never enable overlay.
+- **Library fstab is a commented UUID stub** with marker `90stv-library-mount` and `ro,noload,nofail`. The household fills in the UUID. A second setup run does not duplicate the marker.
+- **Journald drop-in** `packaging/90stv-volatile.conf` → `/etc/systemd/journald.conf.d/90stv-volatile.conf` with `Storage=volatile`. The unit uses `StandardOutput=journal` only; the app writes no log files.
+- **No outbound firewall** in `setup.sh`. timesyncd/NTP is enabled. Avahi uses the hostname `90stv` so `90stv.local` works.
 
 
