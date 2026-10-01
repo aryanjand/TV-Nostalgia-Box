@@ -1,6 +1,7 @@
 """In-memory Clock for tests. Never reads the OS clock and never sleeps."""
 
 from datetime import datetime, timedelta
+from typing import Self
 
 
 class UnawareDateTimeError(ValueError):
@@ -8,9 +9,19 @@ class UnawareDateTimeError(ValueError):
 
 
 class FakeClock:
-    def __init__(self, current_time: datetime, *, trusted: bool) -> None:
+    def __init__(self, current_time: datetime) -> None:
         self._current_time = _require_aware(current_time)
-        self._trusted = trusted
+        self._trusted = False
+
+    @classmethod
+    def trusted(cls, current_time: datetime) -> Self:
+        clock = cls(current_time)
+        clock.mark_trusted()
+        return clock
+
+    @classmethod
+    def untrusted(cls, current_time: datetime) -> Self:
+        return cls(current_time)
 
     def now(self) -> datetime:
         return self._current_time

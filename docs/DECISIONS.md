@@ -39,4 +39,4 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Coverage includes `tv90.config`.** Settings live outside domain/application; the 90% threshold is unchanged.
 - **Clock is a `Protocol`, not an ABC.** Adapters match structurally. Domain and application depend on the port; they never import adapters.
 - **Trust detection:** prefer `/run/systemd/timesync/synchronized` (file present ⇒ synced). If that path is missing or unreadable, run `timedatectl show --property=NTPSynchronized --value` and treat `yes` / `true` / `1` as trusted. If both are unavailable (macOS laptop, no systemd), the clock is untrusted. Unknown never raises and never writes to disk.
-- **FakeClock lives in `adapters/fake_clock.py`.** T12 tests import the same fake. Time advances in memory; it never sleeps on the OS.
+- **FakeClock lives in `adapters/fake_clock.py`.** T12 tests import the same fake. Construct with `FakeClock.trusted(time)` or `FakeClock.untrusted(time)` — not a boolean flag. Time advances in memory; it never sleeps on the OS.

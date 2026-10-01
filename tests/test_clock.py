@@ -12,25 +12,25 @@ MORNING = datetime(2026, 10, 1, 8, 0, tzinfo=VANCOUVER)
 
 
 def test_fake_clock_now_returns_injected_time() -> None:
-    clock = FakeClock(MORNING, trusted=True)
+    clock = FakeClock.untrusted(MORNING)
 
     assert clock.now() == MORNING
 
 
-def test_fake_clock_is_trusted_matches_trusted_construction() -> None:
-    clock = FakeClock(MORNING, trusted=True)
+def test_fake_clock_trusted_construction_is_trusted() -> None:
+    clock = FakeClock.trusted(MORNING)
 
     assert clock.is_trusted() is True
 
 
-def test_fake_clock_is_trusted_matches_untrusted_construction() -> None:
-    clock = FakeClock(MORNING, trusted=False)
+def test_fake_clock_untrusted_construction_is_untrusted() -> None:
+    clock = FakeClock.untrusted(MORNING)
 
     assert clock.is_trusted() is False
 
 
 def test_fake_clock_advance_time_changes_now() -> None:
-    clock = FakeClock(MORNING, trusted=True)
+    clock = FakeClock.untrusted(MORNING)
 
     clock.advance_time(timedelta(minutes=15))
 
@@ -38,7 +38,7 @@ def test_fake_clock_advance_time_changes_now() -> None:
 
 
 def test_fake_clock_mark_trusted_makes_clock_trusted() -> None:
-    clock = FakeClock(MORNING, trusted=False)
+    clock = FakeClock.untrusted(MORNING)
 
     clock.mark_trusted()
 
@@ -46,7 +46,7 @@ def test_fake_clock_mark_trusted_makes_clock_trusted() -> None:
 
 
 def test_fake_clock_mark_untrusted_makes_clock_untrusted() -> None:
-    clock = FakeClock(MORNING, trusted=True)
+    clock = FakeClock.trusted(MORNING)
 
     clock.mark_untrusted()
 
@@ -55,7 +55,7 @@ def test_fake_clock_mark_untrusted_makes_clock_untrusted() -> None:
 
 def test_fake_clock_rejects_naive_datetime() -> None:
     with pytest.raises(UnawareDateTimeError):
-        FakeClock(datetime(2026, 10, 1, 8, 0), trusted=True)
+        FakeClock.trusted(datetime(2026, 10, 1, 8, 0))
 
 
 def test_system_clock_now_returns_injected_time() -> None:
@@ -78,7 +78,7 @@ def test_system_clock_is_trusted_returns_injected_false() -> None:
 
 def test_fake_clock_and_system_clock_satisfy_clock_protocol() -> None:
     clocks: list[Clock] = [
-        FakeClock(MORNING, trusted=True),
+        FakeClock.trusted(MORNING),
         SystemClock(time_source=lambda: MORNING, trust_source=lambda: False),
     ]
 
