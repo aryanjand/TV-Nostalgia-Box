@@ -45,6 +45,7 @@ secrets/
 
 # Metadata caches next to the library (tagger and duration index)
 .tv90-cache/
+.tv90-metadata-cache.json
 *.metadata.json
 duration-index.json
 
