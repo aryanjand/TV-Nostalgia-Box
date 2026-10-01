@@ -281,3 +281,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 753 passed, coverage 99.38%.
 - Commits: `0d2fc1e` keywords; `ff252ba` TVMaze; `39ffac3` tag/index CLI.
 - Metadata: TVMaze ids Little Bear 18005, Oswald 43569, Harry 69573.
+
+### T15
+
+- Status: done. Reviewer APPROVE (round 3). Orchestrator `make check`: 822 passed, coverage 99.14%.
+- Commits: `7ec7ae7` composition; `436262a` setup; `abb41d0` maintenance; `0e1795e` `da62b3b` `f72b34a` overlay-persist fixes.
+- Library flag `.tv90-maintenance` is the source of truth across overlay reboot.
