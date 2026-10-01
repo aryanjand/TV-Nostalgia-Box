@@ -52,7 +52,6 @@ from tv90.domain.episode import Daypart, Episode, HolidayTag
 from tv90.domain.filename import parse_filename
 from tv90.domain.holiday_calendar import HolidayCalendar, load_holiday_calendar
 from tv90.interface.remote import create_remote_app
-from tv90.ports.metadata import EpisodeMetadata, EpisodeMetadataSource
 from tv90.ports.player import format_channel_banner
 
 VANCOUVER = ZoneInfo("America/Vancouver")
@@ -100,6 +99,20 @@ ABSENT_MENU_PATHS = (
 RUNTIME_WRITE_NAMES = frozenset(
     {"duration-index.json", ".tv90-metadata-cache.json", ".tv90-maintenance"}
 )
+PLAYBACK_COLLABORATOR_FIELDS = frozenset(
+    {
+        "clock",
+        "player",
+        "tv_power",
+        "library",
+        "duration_index",
+        "settings",
+        "holiday_calendar",
+        "library_root",
+        "wait",
+        "logger",
+    }
+)
 
 
 class YankablePlayer(FakePlayer):
@@ -127,17 +140,6 @@ class YankablePlayer(FakePlayer):
     def _reject_if_yanked(self, filename: str) -> None:
         if filename in self._yanked:
             raise OSError(f"yanked {filename}")
-
-
-class RecordingMetadataSource:
-    def __init__(self) -> None:
-        self.lookups: list[tuple[str, int, int]] = []
-
-    def lookup(
-        self, show_stem: str, season_number: int, episode_number: int
-    ) -> EpisodeMetadata:
-        self.lookups.append((show_stem, season_number, episode_number))
-        raise AssertionError("playback must not call EpisodeMetadataSource")
 
 
 def _noop_wait(_seconds: float) -> None:
@@ -599,18 +601,22 @@ def test_e2e_web_remote_has_only_four_buttons_and_now_playing(tmp_path: Path) ->
         assert client.get(path).status_code == HTTPStatus.NOT_FOUND
 
 
-def test_e2e_playback_does_not_call_episode_metadata_source(tmp_path: Path) -> None:
-    metadata: EpisodeMetadataSource = RecordingMetadataSource()
+def test_e2e_playback_collaborators_have_no_metadata_source(tmp_path: Path) -> None:
     clock = FakeClock.trusted(_at(JULY_WEEK_START, 8, 0))
     controller, clock, player, _power, _calendar = _controller(tmp_path, clock=clock)
     controller.tick()
     _join_live(controller, clock, player, _at(JULY_WEEK_START, 13, 0))
     _surf_wrap(controller, clock)
 
-    assert isinstance(metadata, RecordingMetadataSource)
-    assert metadata.lookups == []
     collaborator_fields = tuple(fields(TelevisionCollaborators))
+    names = {item.name for item in collaborator_fields}
+    assert names == PLAYBACK_COLLABORATOR_FIELDS
+    annotation_text = " ".join(
+        f"{name} {hint}"
+        for name, hint in TelevisionCollaborators.__annotations__.items()
+    )
+    assert "metadata" not in annotation_text.lower()
+    assert "EpisodeMetadataSource" not in annotation_text
     assert not any("metadata" in item.name.lower() for item in collaborator_fields)
     assert not any("metadata" in str(item.type).lower() for item in collaborator_fields)
-    assert "EpisodeMetadataSource" not in TelevisionCollaborators.__annotations__
-    assert controller.now_playing() != NOW_PLAYING_CLOCK_NOT_SYNCED
+    _require_playing(controller)
