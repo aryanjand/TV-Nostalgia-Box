@@ -215,3 +215,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 372 passed, coverage 100%.
 - Commits: `3e61ba7` feat time-of-day weight; `9bc0430` docs.
 - Interface: `TimeOfDayWeight(settings).weight(episode, clock_hour) -> float`; `gaussian_weight` plain function.
+
+### T4
+
+- Status: done. Reviewer APPROVE. Orchestrator `make check`: 410 passed, coverage 100%.
+- Commits: `20e495b` feat season weight; `ded1a79` docs.
+- Interface: `month_to_season(month)`, `SeasonWeight(settings).weight(episode, month)`.
