@@ -14,6 +14,8 @@ UNIT_SOURCE="${SCRIPT_DIR}/packaging/90stv.service"
 UNIT_DEST="/etc/systemd/system/90stv.service"
 JOURNALD_SOURCE="${SCRIPT_DIR}/packaging/90stv-volatile.conf"
 JOURNALD_DEST="/etc/systemd/journald.conf.d/90stv-volatile.conf"
+MAINTENANCE_SOURCE="${SCRIPT_DIR}/scripts/tv90-maintenance"
+MAINTENANCE_DEST="/usr/local/bin/tv90-maintenance"
 OVERLAYROOT_LOCAL="/etc/overlayroot.local.conf"
 # recurse=0 keeps /srv/90stv/library remountable; Bookworm default recurse=1 overlays every mount.
 OVERLAYROOT_LINE='overlayroot="tmpfs:recurse=0"'
@@ -152,6 +154,10 @@ ensure_overlayroot_local() {
   printf '%s\n' "${OVERLAYROOT_LINE}" > "${OVERLAYROOT_LOCAL}"
 }
 
+ensure_maintenance() {
+  install -m 755 "${MAINTENANCE_SOURCE}" "${MAINTENANCE_DEST}"
+}
+
 ensure_overlay() {
   if ! is_raspberry_pi; then
     log "skip overlay: not a Raspberry Pi (device-tree / /boot/firmware)"
@@ -175,6 +181,7 @@ main() {
   ensure_unit
   ensure_journald
   ensure_kiosk
+  ensure_maintenance
   ensure_overlay
   log "setup complete: hostname ${HOSTNAME_VALUE}, library ${LIBRARY_PATH}, user ${TV90_USER}"
 }

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Installed to /usr/local/bin/tv90-maintenance by setup.sh.
+# Why: the Pi venv has the packaged module; a laptop uses PATH python3.
+set -euo pipefail
+
+if [[ -x /opt/90stv/venv/bin/python3 ]]; then
+  exec /opt/90stv/venv/bin/python3 -m tv90.application.maintenance "$@"
+fi
+exec python3 -m tv90.application.maintenance "$@"

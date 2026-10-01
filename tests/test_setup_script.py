@@ -63,6 +63,7 @@ def test_setup_script_is_idempotent_about_fstab_and_units() -> None:
     assert "ro" in SETUP_SCRIPT
     assert "/srv/90stv/library" in SETUP_SCRIPT
     assert "90stv.service" in SETUP_SCRIPT
+    assert "tv90-maintenance" in SETUP_SCRIPT
 
 
 def test_unit_file_restarts_always_and_logs_to_journal() -> None:

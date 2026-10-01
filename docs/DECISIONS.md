@@ -202,5 +202,7 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Library fstab is a commented UUID stub** with marker `90stv-library-mount` and `ro,noload,nofail`. The household fills in the UUID. A second setup run does not duplicate the marker.
 - **Journald drop-in** `packaging/90stv-volatile.conf` → `/etc/systemd/journald.conf.d/90stv-volatile.conf` with `Storage=volatile`. The unit uses `StandardOutput=journal` only; the app writes no log files.
 - **No outbound firewall** in `setup.sh`. timesyncd/NTP is enabled. Avahi uses the hostname `90stv` so `90stv.local` works.
+- **`tv90-maintenance` is application logic plus a bash wrapper.** `enter_maintenance` / `leave_maintenance` take a `MaintenanceHost`. Tests inject a fake; `SystemMaintenanceHost` takes a command runner so tests never call raspi-config, mount, or systemctl. The wrapper (`scripts/tv90-maintenance`, installed to `/usr/local/bin`) execs `python3 -m tv90.application.maintenance`. No `dry_run` flag; `status` is the query.
+- **Mode detection:** TV mode if the service is active **or** the overlay is enabled; otherwise maintenance. `on`/`off` no-op when already in that mode and still print `maintenance mode` or `tv mode`. Overlay disable/enable on a Pi asks raspi-config and reboots when that command succeeds. Laptop: skip overlay and remount (library is not a mount) with a message, do not crash.
 
 
