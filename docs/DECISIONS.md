@@ -122,3 +122,15 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Channel headers** match the README show column: `CH 01 Little Bear`, `CH 02 Oswald`, `CH 03 Harry and His Bucket Full of Dinosaurs`, `CH 04 Holiday movies`.
 - **CLI composition:** `main(argv, environ, stdout) -> int` is injectable. `run()` is the thin wrapper that passes `sys.argv[1:]`, `os.environ`, and `sys.stdout`. `__main__.py` calls `run()`. `load_settings` and `load_holiday_calendar` read the injected mapping only. Argparse subparsers: only `simulate` now; T14 adds `tag` and `index` on the same `add_subparsers` set. Invalid command or missing `--date` is a non-zero exit with a specific argparse error on the injected stdout.
 - **Interface is not a coverage source.** Tests call `main(...)` with argv/environ/stdout (no `sys.argv`, no process env). Adding `tv90.application.simulate` to application coverage is enough.
+
+## T10
+
+- **Player methods are split by join kind.** `fade_to_next` is the same-channel / same-friend join. `tune_to` is a channel change. There is no `fade=True` flag. `load` is the hard seek used for power-on and retune-to-airing.
+- **Volume range on the player is [0, 1].** Non-finite values and anything outside that interval raise `InvalidVolumeError`. The player does not clamp and does not ignore the call. T12 enforces `volume_ceiling`; a value such as 0.80 is valid here.
+- **OSD banner text is `CH 0N`** with a two-digit zero-padded number (`format_channel_banner`). Duration and neon color come from Settings (`osd_banner_seconds`, `osd_color`). FakePlayer records those values and returns immediately — it never sleeps the banner duration.
+- **Volume bar is 10 segments** (`█` filled, `░` empty) so 40% is `████░░░░░░`. Ten segments map one block to 10% without a second Settings field.
+- **Calm slate color is `#3A4A42` (`CALM_SLATE_COLOR`).** Muted sage, not neon OSD green. Soft color field only — not a still of the current friend (that would need a screenshot write or an extra media file).
+- **Tuner effect is a black frame**, recorded on FakePlayer as `BLACK_FRAME_TUNER_EFFECT`. Generated noise would need a bundled clip or a lavfi graph; a black overlay needs neither.
+- **Same-friend join is a fade**, duration `episode_join_fade_seconds`. A still bumper was the alternative; fade stays in IPC and does not write a screenshot.
+- **`playback_has_ended()` is a CQS query.** It does not clear. FakePlayer exposes `mark_playback_ended()` (same style as `FakeClock.mark_trusted`), not a constructor flag.
+- **No on-disk state.** FakePlayer never opens files. The command log is an in-memory tuple of frozen dataclasses.
