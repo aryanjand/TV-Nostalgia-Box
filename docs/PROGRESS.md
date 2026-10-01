@@ -129,9 +129,9 @@ Run only in maintenance mode.
 | T10 | `Player` port, fake player, mpv IPC adapter | T1 | done |
 | T11 | `TvPower` port, fake, cec-client adapter; sleep and sign-on scheduling | T1 | done |
 | T12 | TV controller | T8, T10, T11 | done |
-| T13 | Flask web remote bound to the LAN | T12 | in progress |
-| T14 | Maintenance tools: `tv90 tag` and `tv90 index` | T1, T2 | pending |
-| T15 | Composition root, `90stv.service`, `setup.sh`, `tv90-maintenance on\|off` | T12, T13, T14 | pending |
+| T13 | Flask web remote bound to the LAN | T12 | done |
+| T14 | Maintenance tools: `tv90 tag` and `tv90 index` | T1, T2 | done |
+| T15 | Composition root, `90stv.service`, `setup.sh`, `tv90-maintenance on\|off` | T12, T13, T14 | in progress |
 | T16 | End-to-end tests with fakes; `docs/OPERATIONS.md` | T9, T15 | pending |
 | T17 | Whole-repo review against full README and build prompt; fix findings | T16 | pending |
 
@@ -275,3 +275,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 694 passed, coverage 99.37%.
 - Commits: `64c5e3b` Flask remote; `b7d216a` docs.
 - Interface: `create_remote_app(controller)`; GET `/` plus four POST actions only.
+
+### T14
+
+- Status: done. Reviewer APPROVE. Orchestrator `make check`: 753 passed, coverage 99.38%.
+- Commits: `0d2fc1e` keywords; `ff252ba` TVMaze; `39ffac3` tag/index CLI.
+- Metadata: TVMaze ids Little Bear 18005, Oswald 43569, Harry 69573.
