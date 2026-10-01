@@ -116,8 +116,8 @@ Run only in maintenance mode.
 
 | ID | Task | Blocked by | Status |
 | --- | --- | --- | --- |
-| T0 | Scaffold: `pyproject.toml`, tooling, `Makefile`, package skeleton, `.gitignore`, `docs/DECISIONS.md`, this file; amend README per overrides | none | in progress |
-| T1 | Configuration module (constants + env overrides); `Clock` port including trusted-time status, system and fake implementations | T0 | pending |
+| T0 | Scaffold: `pyproject.toml`, tooling, `Makefile`, package skeleton, `.gitignore`, `docs/DECISIONS.md`, this file; amend README per overrides | none | done |
+| T1 | Configuration module (constants + env overrides); `Clock` port including trusted-time status, system and fake implementations | T0 | in progress |
 | T2 | Episode model, filename tag parser and formatter, library source port (filesystem and fake), `DurationIndex` and `MediaProber` ports (file-backed, ffprobe, and fakes) | T0 | pending |
 | T3 | Time-of-day weight | T1, T2 | pending |
 | T4 | Season mapping and season weight | T1, T2 | pending |
