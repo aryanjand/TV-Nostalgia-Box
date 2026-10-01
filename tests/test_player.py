@@ -19,8 +19,11 @@ from tv90.adapters.fake_player import (
     TunerChangeCommand,
 )
 from tv90.adapters.mpv_ipc_player import (
+    MILLISECONDS_PER_SECOND,
     MPV_PERCENT_VOLUME_SCALE,
     OSD_FONT_NAME,
+    SLATE_OVERLAY_ID,
+    TUNER_OVERLAY_ID,
     MpvIpcError,
     MpvIpcPlayer,
     ass_bgr_from_hex,
@@ -271,6 +274,14 @@ class RecordingSender:
         return {"error": "success"}
 
 
+class RecordingWait:
+    def __init__(self) -> None:
+        self.durations: list[float] = []
+
+    def __call__(self, duration_seconds: float) -> None:
+        self.durations.append(duration_seconds)
+
+
 class ScriptedEventReader:
     def __init__(self, events: list[Mapping[str, object]]) -> None:
         self._events = list(events)
@@ -284,9 +295,14 @@ class ScriptedEventReader:
 def _mpv_player(
     sender: RecordingSender | None = None,
     reader: ScriptedEventReader | None = None,
-) -> tuple[MpvIpcPlayer, RecordingSender]:
+) -> tuple[MpvIpcPlayer, RecordingSender, RecordingWait]:
     recording = sender if sender is not None else RecordingSender()
-    return MpvIpcPlayer(load_settings({}), recording, reader), recording
+    waiter = RecordingWait()
+    return (
+        MpvIpcPlayer(load_settings({}), recording, reader, wait=waiter),
+        recording,
+        waiter,
+    )
 
 
 def _command_tokens(payload: Mapping[str, object]) -> list[object]:
@@ -296,11 +312,23 @@ def _command_tokens(payload: Mapping[str, object]) -> list[object]:
 
 
 def _commands_named(payloads: list[dict[str, object]], name: str) -> list[list[object]]:
-    return [
-        tokens
-        for tokens in (_command_tokens(payload) for payload in payloads)
-        if tokens and tokens[0] == name
-    ]
+    named: list[list[object]] = []
+    for payload in payloads:
+        command = payload["command"]
+        if isinstance(command, list) and command and command[0] == name:
+            named.append(command)
+    return named
+
+
+def _overlay_commands(
+    payloads: list[dict[str, object]],
+) -> list[Mapping[str, object]]:
+    overlays: list[Mapping[str, object]] = []
+    for payload in payloads:
+        command = payload["command"]
+        if isinstance(command, Mapping) and command.get("name") == "osd-overlay":
+            overlays.append(command)
+    return overlays
 
 
 def _exercise_player(player: Player) -> None:
@@ -315,7 +343,7 @@ def _exercise_player(player: Player) -> None:
 
 
 def test_mpv_load_sends_loadfile_with_start_offset() -> None:
-    player, sender = _mpv_player()
+    player, sender, _waiter = _mpv_player()
 
     player.load(LITTLE_BEAR_FILENAME, 17.5)
 
@@ -331,7 +359,7 @@ def test_mpv_load_sends_loadfile_with_start_offset() -> None:
 
 
 def test_mpv_set_volume_sends_percent_scale() -> None:
-    player, sender = _mpv_player()
+    player, sender, _waiter = _mpv_player()
 
     player.set_volume(0.4)
 
@@ -341,7 +369,7 @@ def test_mpv_set_volume_sends_percent_scale() -> None:
 
 
 def test_mpv_invalid_volume_raises_and_sends_nothing_new() -> None:
-    player, sender = _mpv_player()
+    player, sender, _waiter = _mpv_player()
     before = list(sender.payloads)
 
     with pytest.raises(InvalidVolumeError):
@@ -353,7 +381,7 @@ def test_mpv_invalid_volume_raises_and_sends_nothing_new() -> None:
 def test_mpv_channel_banner_sends_osd_without_sleeping() -> None:
     settings = replace(load_settings({}), osd_banner_seconds=2.5, osd_color="#00FF00")
     sender = RecordingSender()
-    player = MpvIpcPlayer(settings, sender)
+    player = MpvIpcPlayer(settings, sender, wait=RecordingWait())
 
     player.show_channel_banner(3)
 
@@ -364,7 +392,7 @@ def test_mpv_channel_banner_sends_osd_without_sleeping() -> None:
 
 
 def test_mpv_volume_bar_sends_segmented_osd() -> None:
-    player, sender = _mpv_player()
+    player, sender, _waiter = _mpv_player()
 
     player.show_volume_bar(0.4)
 
@@ -379,7 +407,8 @@ def test_mpv_fade_and_tune_send_different_commands() -> None:
         tuner_burst_milliseconds=150,
     )
     sender = RecordingSender()
-    player = MpvIpcPlayer(settings, sender)
+    waiter = RecordingWait()
+    player = MpvIpcPlayer(settings, sender, wait=waiter)
 
     player.fade_to_next(LITTLE_BEAR_NEXT_FILENAME, 0.0)
     fade_payloads = list(sender.payloads)
@@ -397,26 +426,55 @@ def test_mpv_fade_and_tune_send_different_commands() -> None:
     assert "afade=t=in:st=0:d=1.5" in str(fade_options["af"])
     assert tune_options == {"start": 8.25}
     assert "vf" not in tune_options
-    overlay = _commands_named(tune_payloads, "osd-overlay")
-    assert overlay
-    overlay_data = overlay[-1][1]
-    assert isinstance(overlay_data, dict)
-    assert "\\t(0,150," in str(overlay_data["data"])
+    overlays = _overlay_commands(tune_payloads)
+    shown = [overlay for overlay in overlays if overlay.get("format") == "ass-events"]
+    removed = [
+        overlay
+        for overlay in overlays
+        if overlay.get("format") == "none" and overlay.get("id") == TUNER_OVERLAY_ID
+    ]
+    assert shown
+    assert removed
+    assert overlays.index(shown[0]) < overlays.index(removed[0])
+    assert "\\t(" not in str(shown[0]["data"])
+    assert ass_bgr_from_hex("#000000") in str(shown[0]["data"])
+    assert waiter.durations == [
+        settings.tuner_burst_milliseconds / MILLISECONDS_PER_SECOND
+    ]
     assert fade_payloads != sender.payloads[len(fade_payloads) :]
 
 
 def test_mpv_slate_covers_the_screen_with_named_color() -> None:
-    player, sender = _mpv_player()
+    player, sender, _waiter = _mpv_player()
 
     player.show_slate()
 
-    tokens = [_command_tokens(payload) for payload in sender.payloads]
+    tokens = [
+        _command_tokens(payload)
+        for payload in sender.payloads
+        if isinstance(payload["command"], list)
+    ]
     assert ["stop"] in tokens
-    overlays = _commands_named(sender.payloads, "osd-overlay")
-    assert overlays
-    overlay = overlays[-1][1]
-    assert isinstance(overlay, dict)
+    overlays = _overlay_commands(sender.payloads)
+    shown = [overlay for overlay in overlays if overlay.get("format") == "ass-events"]
+    assert shown
+    overlay = shown[-1]
+    assert overlay["id"] == SLATE_OVERLAY_ID
+    assert overlay["name"] == "osd-overlay"
     assert ass_bgr_from_hex(CALM_SLATE_COLOR) in str(overlay["data"])
+
+
+def test_mpv_osd_overlay_uses_named_command_object() -> None:
+    player, sender, _waiter = _mpv_player()
+
+    player.show_slate()
+
+    overlays = _overlay_commands(sender.payloads)
+    assert overlays
+    for payload in sender.payloads:
+        command = payload["command"]
+        if isinstance(command, list):
+            assert command[0] != "osd-overlay"
 
 
 def test_mpv_spawn_arguments_disable_watch_later_and_disk_cache() -> None:
@@ -434,7 +492,7 @@ def test_mpv_spawn_arguments_disable_watch_later_and_disk_cache() -> None:
 
 def test_mpv_observes_eof_reached_on_construction() -> None:
     sender = RecordingSender()
-    MpvIpcPlayer(load_settings({}), sender)
+    MpvIpcPlayer(load_settings({}), sender, wait=RecordingWait())
 
     assert ["observe_property", 1, "eof-reached"] in [
         _command_tokens(payload) for payload in sender.payloads
@@ -445,7 +503,7 @@ def test_mpv_playback_has_ended_from_eof_event_does_not_clear() -> None:
     reader = ScriptedEventReader(
         [{"event": "property-change", "name": "eof-reached", "data": True}]
     )
-    player, _sender = _mpv_player(reader=reader)
+    player, _sender, _waiter = _mpv_player(reader=reader)
 
     assert player.playback_has_ended() is True
     assert player.playback_has_ended() is True
@@ -453,7 +511,7 @@ def test_mpv_playback_has_ended_from_eof_event_does_not_clear() -> None:
 
 def test_mpv_playback_has_ended_from_end_file_eof() -> None:
     reader = ScriptedEventReader([{"event": "end-file", "reason": "eof"}])
-    player, _sender = _mpv_player(reader=reader)
+    player, _sender, _waiter = _mpv_player(reader=reader)
 
     assert player.playback_has_ended() is True
 
@@ -462,7 +520,7 @@ def test_mpv_load_discards_stale_end_events() -> None:
     reader = ScriptedEventReader(
         [{"event": "property-change", "name": "eof-reached", "data": True}]
     )
-    player, _sender = _mpv_player(reader=reader)
+    player, _sender, _waiter = _mpv_player(reader=reader)
 
     player.load(LITTLE_BEAR_FILENAME, 0.0)
 
@@ -470,7 +528,7 @@ def test_mpv_load_discards_stale_end_events() -> None:
 
 
 def test_mpv_stop_sends_stop() -> None:
-    player, sender = _mpv_player()
+    player, sender, _waiter = _mpv_player()
 
     player.stop()
 
@@ -478,7 +536,7 @@ def test_mpv_stop_sends_stop() -> None:
 
 
 def test_mpv_payloads_are_json_serializable() -> None:
-    player, sender = _mpv_player()
+    player, sender, _waiter = _mpv_player()
     _exercise_player(player)
 
     for payload in sender.payloads:
@@ -490,7 +548,7 @@ def test_fake_and_mpv_satisfy_player_contract() -> None:
     settings = load_settings({})
     fake = FakePlayer(settings)
     sender = RecordingSender()
-    mpv = MpvIpcPlayer(settings, sender)
+    mpv = MpvIpcPlayer(settings, sender, wait=RecordingWait())
 
     for player in (fake, mpv):
         _exercise_player(player)
@@ -511,7 +569,7 @@ def test_mpv_adapter_does_not_write_library_files(tmp_path: Path) -> None:
     episode = library / LITTLE_BEAR_FILENAME
     episode.write_bytes(LIBRARY_EPISODE_BYTES)
     before = _library_snapshot(library)
-    player, _sender = _mpv_player()
+    player, _sender, _waiter = _mpv_player()
 
     player.load(str(episode), 3.0)
     player.fade_to_next(str(episode), 0.0)

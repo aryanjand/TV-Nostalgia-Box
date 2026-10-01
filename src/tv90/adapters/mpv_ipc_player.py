@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import socket
 import subprocess
+import time
 from collections.abc import Callable, Mapping
 
 from tv90.config import CALM_SLATE_COLOR, Settings
@@ -16,6 +17,7 @@ from tv90.ports.player import (
 
 MpvIpcCommandSender = Callable[[Mapping[str, object]], Mapping[str, object]]
 MpvIpcEventReader = Callable[[], Mapping[str, object] | None]
+DurationWait = Callable[[float], None]
 
 MPV_BINARY = "mpv"
 MPV_NO_CONFIG_FLAG = "--no-config"
@@ -85,10 +87,14 @@ class MpvIpcPlayer:
         settings: Settings,
         send_command: MpvIpcCommandSender,
         read_event: MpvIpcEventReader | None = None,
+        *,
+        wait: DurationWait = time.sleep,
     ) -> None:
         self._settings = settings
         self._send_command = send_command
         self._read_event = read_event
+        # Production waits the tuner burst; tests inject a recorder that does not sleep.
+        self._wait = wait
         self._playback_ended = False
         self._send(
             [
@@ -124,10 +130,9 @@ class MpvIpcPlayer:
     def tune_to(self, filename: str, offset_seconds: float) -> None:
         self._begin_playback()
         self._clear_overlay(SLATE_OVERLAY_ID)
-        self._send_overlay(
-            TUNER_OVERLAY_ID,
-            _tuner_black_ass(self._settings.tuner_burst_milliseconds),
-        )
+        self._send_overlay(TUNER_OVERLAY_ID, _black_ass())
+        self._wait(self._settings.tuner_burst_milliseconds / MILLISECONDS_PER_SECOND)
+        self._clear_overlay(TUNER_OVERLAY_ID)
         self._send_loadfile(filename, offset_seconds, {})
 
     def show_slate(self) -> None:
@@ -209,30 +214,27 @@ class MpvIpcPlayer:
         self._clear_overlay(TUNER_OVERLAY_ID)
 
     def _clear_overlay(self, overlay_id: int) -> None:
+        # Named object: array form treats the first osd-overlay argument as integer id.
         self._send(
-            [
-                OSD_OVERLAY_COMMAND,
-                {
-                    "id": overlay_id,
-                    "format": OVERLAY_FORMAT_NONE,
-                    "data": "",
-                },
-            ]
+            {
+                "name": OSD_OVERLAY_COMMAND,
+                "id": overlay_id,
+                "format": OVERLAY_FORMAT_NONE,
+                "data": "",
+            }
         )
 
     def _send_overlay(self, overlay_id: int, data: str) -> None:
         self._send(
-            [
-                OSD_OVERLAY_COMMAND,
-                {
-                    "id": overlay_id,
-                    "format": OVERLAY_FORMAT_ASS,
-                    "data": data,
-                },
-            ]
+            {
+                "name": OSD_OVERLAY_COMMAND,
+                "id": overlay_id,
+                "format": OVERLAY_FORMAT_ASS,
+                "data": data,
+            }
         )
 
-    def _send(self, command: list[object]) -> Mapping[str, object]:
+    def _send(self, command: list[object] | dict[str, object]) -> Mapping[str, object]:
         return self._send_command({"command": command})
 
 
@@ -320,19 +322,18 @@ def _event_reports_playback_ended(event: Mapping[str, object]) -> bool:
 
 
 def _slate_ass(hex_color: str) -> str:
-    return _ass_rectangle(ass_bgr_from_hex(hex_color), "")
+    return _ass_rectangle(ass_bgr_from_hex(hex_color))
 
 
-def _tuner_black_ass(burst_milliseconds: int) -> str:
-    # ASS \t makes the black field transparent after the burst; no Python sleep.
-    timed = f"\\t(0,{burst_milliseconds},\\1a&HFF&)"
-    return _ass_rectangle(ass_bgr_from_hex(BLACK_HEX_COLOR), timed)
+def _black_ass() -> str:
+    return _ass_rectangle(ass_bgr_from_hex(BLACK_HEX_COLOR))
 
 
-def _ass_rectangle(ass_color: str, timed_override: str) -> str:
+def _ass_rectangle(ass_color: str) -> str:
     # an7 pins the drawing to the top-left so a 4K rectangle covers 1080p and 4K.
+    # Hold this field; do not use ASS \t — osd-overlay ignores event timing.
     return (
-        f"{{\\an7\\p1\\bord0\\shad0\\1c{ass_color}\\1a&H00&{timed_override}}}"
+        f"{{\\an7\\p1\\bord0\\shad0\\1c{ass_color}\\1a&H00&}}"
         f"m 0 0 l {OVERLAY_WIDTH} 0 {OVERLAY_WIDTH} {OVERLAY_HEIGHT} "
         f"0 {OVERLAY_HEIGHT}"
     )
