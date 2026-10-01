@@ -117,8 +117,8 @@ Run only in maintenance mode.
 | ID | Task | Blocked by | Status |
 | --- | --- | --- | --- |
 | T0 | Scaffold: `pyproject.toml`, tooling, `Makefile`, package skeleton, `.gitignore`, `docs/DECISIONS.md`, this file; amend README per overrides | none | done |
-| T1 | Configuration module (constants + env overrides); `Clock` port including trusted-time status, system and fake implementations | T0 | in progress |
-| T2 | Episode model, filename tag parser and formatter, library source port (filesystem and fake), `DurationIndex` and `MediaProber` ports (file-backed, ffprobe, and fakes) | T0 | pending |
+| T1 | Configuration module (constants + env overrides); `Clock` port including trusted-time status, system and fake implementations | T0 | done |
+| T2 | Episode model, filename tag parser and formatter, library source port (filesystem and fake), `DurationIndex` and `MediaProber` ports (file-backed, ffprobe, and fakes) | T0 | in progress |
 | T3 | Time-of-day weight | T1, T2 | pending |
 | T4 | Season mapping and season weight | T1, T2 | pending |
 | T5 | Holiday calendar: constants table, env overrides, date rules, CH 04 windows, Layer A multiplier | T1, T2 | pending |
@@ -197,3 +197,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 6 passed, domain/application coverage 100% (empty packages).
 - Commits: `266d5a1` docs README overrides; `d2181a0` chore scaffold; `dba98ab` docs DECISIONS.
 - Note: `make check` uses `.venv/bin` tools (uv-provisioned CPython 3.11.15).
+
+### T1
+
+- Status: done. Reviewer APPROVE (round 2). Orchestrator `make check`: 45 passed, config/domain/application coverage 100%.
+- Commits: `84f2e34` feat config; `dd678d3` feat clock; `fcb19b6` `871706e` `9371005` review fixes.
+- Interfaces for later tasks: `tv90.config.load_settings`, `Settings`, named constants; `tv90.ports.Clock`; `tv90.adapters.FakeClock.trusted` / `untrusted`; `tv90.adapters.SystemClock` with injected sources.
