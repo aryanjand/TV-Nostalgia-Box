@@ -37,3 +37,6 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Invalid environment values raise `InvalidSettingsError`.** A missing key keeps the default. Empty, non-numeric, negative lead days, or night lock at or before sign-on never fall back silently and never return None.
 - **`load_settings` takes an injected mapping.** It does not read `os.environ` at import time, so tests stay pure. T15 passes the real environment at the composition root.
 - **Coverage includes `tv90.config`.** Settings live outside domain/application; the 90% threshold is unchanged.
+- **Clock is a `Protocol`, not an ABC.** Adapters match structurally. Domain and application depend on the port; they never import adapters.
+- **Trust detection:** prefer `/run/systemd/timesync/synchronized` (file present ⇒ synced). If that path is missing or unreadable, run `timedatectl show --property=NTPSynchronized --value` and treat `yes` / `true` / `1` as trusted. If both are unavailable (macOS laptop, no systemd), the clock is untrusted. Unknown never raises and never writes to disk.
+- **FakeClock lives in `adapters/fake_clock.py`.** T12 tests import the same fake. Time advances in memory; it never sleeps on the OS.
