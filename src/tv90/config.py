@@ -26,6 +26,7 @@ SIGN_ON_HOUR = 6.5
 NIGHT_LOCK_HOUR = 21.0
 MINIMUM_CLOCK_HOUR = 0.0
 MAXIMUM_CLOCK_HOUR = 24.0
+MINIMUM_NON_NEGATIVE_VALUE = 0
 
 MORNING_GAUSSIAN_MEAN = 8.0
 MORNING_GAUSSIAN_STANDARD_DEVIATION = 2.0
@@ -76,7 +77,7 @@ WINTER_MONTHS = (12, 1, 2)
 
 
 class InvalidSettingsError(Exception):
-    """An environment override is missing a usable value."""
+    """An environment override cannot be parsed or is out of range."""
 
     def __init__(self, variable_name: str, reason: str) -> None:
         self.variable_name = variable_name
@@ -186,7 +187,7 @@ def _load_clock_trust_timeout_seconds(environ: Mapping[str, str]) -> int:
         CLOCK_TRUST_TIMEOUT_ENVIRONMENT_NAME,
         DEFAULT_CLOCK_TRUST_TIMEOUT_SECONDS,
     )
-    if timeout_seconds < 0:
+    if timeout_seconds < MINIMUM_NON_NEGATIVE_VALUE:
         raise InvalidSettingsError(
             CLOCK_TRUST_TIMEOUT_ENVIRONMENT_NAME, "must not be negative"
         )
@@ -199,7 +200,7 @@ def _load_holiday_lead_days(environ: Mapping[str, str]) -> int:
         HOLIDAY_LEAD_DAYS_ENVIRONMENT_NAME,
         DEFAULT_HOLIDAY_LEAD_DAYS,
     )
-    if holiday_lead_days < 0:
+    if holiday_lead_days < MINIMUM_NON_NEGATIVE_VALUE:
         raise InvalidSettingsError(
             HOLIDAY_LEAD_DAYS_ENVIRONMENT_NAME, "must not be negative"
         )
@@ -212,7 +213,11 @@ def _load_clock_hour(
     clock_hour = _load_finite_number(environ, variable_name, default)
     if clock_hour < MINIMUM_CLOCK_HOUR or clock_hour > MAXIMUM_CLOCK_HOUR:
         raise InvalidSettingsError(
-            variable_name, "must be a decimal hour between 0 and 24"
+            variable_name,
+            (
+                "must be a decimal hour between "
+                f"{MINIMUM_CLOCK_HOUR} and {MAXIMUM_CLOCK_HOUR}"
+            ),
         )
     return clock_hour
 

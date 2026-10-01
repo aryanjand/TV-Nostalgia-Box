@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 SYSTEMD_TIMESYNC_SYNCHRONIZED_PATH = Path("/run/systemd/timesync/synchronized")
 # Cap the NTP probe so a stuck timedatectl cannot freeze kiosk start.
 TIMEDATECTL_PROBE_TIMEOUT_SECONDS = 2
+TIMEDATECTL_TRUSTED_VALUES = frozenset({"yes", "true", "1"})
 
 
 class SystemClock:
@@ -50,7 +51,7 @@ def detect_system_clock_trust(
         output = read_timedatectl()
     except (OSError, subprocess.SubprocessError):
         return False
-    return output.strip().lower() in {"yes", "true", "1"}
+    return output.strip().lower() in TIMEDATECTL_TRUSTED_VALUES
 
 
 def _system_trust_source() -> bool:
