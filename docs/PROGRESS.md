@@ -124,9 +124,9 @@ Run only in maintenance mode.
 | T5 | Holiday calendar: constants table, env overrides, date rules, CH 04 windows, Layer A multiplier | T1, T2 | done |
 | T6 | Recency weight | T1, T2 | done |
 | T7 | Combined weight and seeded daily timeline builder with sign-on and night lock | T3, T4, T5, T6 | done |
-| T8 | Channel lineup with ghost channel and wrap rules; "airing now" resolver (file plus offset) | T5, T7 | in progress |
-| T9 | Schedule simulator CLI: `python -m tv90 simulate --date YYYY-MM-DD` | T8 | pending |
-| T10 | `Player` port, fake player, mpv IPC adapter | T1 | pending |
+| T8 | Channel lineup with ghost channel and wrap rules; "airing now" resolver (file plus offset) | T5, T7 | done |
+| T9 | Schedule simulator CLI: `python -m tv90 simulate --date YYYY-MM-DD` | T8 | done |
+| T10 | `Player` port, fake player, mpv IPC adapter | T1 | in progress |
 | T11 | `TvPower` port, fake, cec-client adapter; sleep and sign-on scheduling | T1 | pending |
 | T12 | TV controller | T8, T10, T11 | pending |
 | T13 | Flask web remote bound to the LAN | T12 | pending |
@@ -245,3 +245,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 543 passed, coverage 100%.
 - Commits: `3492ddd` lineup; `d5d77f6` airing now.
 - Interface: `ChannelLineup`, `episodes_for_channel`, `resolve_airing`, `Station`.
+
+### T9
+
+- Status: done. Reviewer APPROVE. Orchestrator `make check`: 566 passed, coverage 100%. Simulator: summer date CH 01–03 only; 2024-10-31 includes CH 04.
+- Commits: `2d0872f` simulate CLI; `73e5057` docs.
+- Interface: `python -m tv90 simulate --date YYYY-MM-DD [--library PATH]`.
