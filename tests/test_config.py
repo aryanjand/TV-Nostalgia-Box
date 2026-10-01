@@ -1,3 +1,4 @@
+from dataclasses import FrozenInstanceError
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -54,6 +55,13 @@ def test_load_settings_with_empty_environ_uses_documented_defaults() -> None:
     assert settings.in_season_weight == 1.0
     assert settings.evergreen_season_weight == 0.20
     assert settings.wrong_season_weight == 0.05
+
+
+def test_assigning_a_settings_field_raises() -> None:
+    settings = load_settings({})
+
+    with pytest.raises(FrozenInstanceError):
+        setattr(settings, "sign_on_hour", 7.0)
 
 
 def test_load_settings_overrides_timezone() -> None:
