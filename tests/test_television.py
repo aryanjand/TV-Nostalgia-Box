@@ -876,3 +876,16 @@ def test_early_eof_on_last_slot_holds_slate(tmp_path: Path) -> None:
     assert player.showing_slate is True
     assert controller.now_playing() == NOW_PLAYING_SLATE
     assert _fade_commands(player) == ()
+
+
+def test_television_module_does_not_import_metadata_source() -> None:
+    import tv90.application.television as television
+
+    assert television.__file__ is not None
+    source = Path(television.__file__).read_text(encoding="utf-8")
+    assert "EpisodeMetadata" not in source
+    assert "tvmaze" not in source.lower()
+    assert "keyword_rules" not in source
+    assert "preview_tags" not in source
+    assert "index_library_durations" not in source
+    assert "write_duration_index" not in source
