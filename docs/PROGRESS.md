@@ -132,8 +132,8 @@ Run only in maintenance mode.
 | T13 | Flask web remote bound to the LAN | T12 | done |
 | T14 | Maintenance tools: `tv90 tag` and `tv90 index` | T1, T2 | done |
 | T15 | Composition root, `90stv.service`, `setup.sh`, `tv90-maintenance on\|off` | T12, T13, T14 | in progress |
-| T16 | End-to-end tests with fakes; `docs/OPERATIONS.md` | T9, T15 | pending |
-| T17 | Whole-repo review against full README and build prompt; fix findings | T16 | pending |
+| T16 | End-to-end tests with fakes; `docs/OPERATIONS.md` | T9, T15 | done |
+| T17 | Whole-repo review against full README and build prompt; fix findings | T16 | in progress |
 
 ## Cycle check
 
@@ -287,3 +287,8 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE (round 3). Orchestrator `make check`: 822 passed, coverage 99.14%.
 - Commits: `7ec7ae7` composition; `436262a` setup; `abb41d0` maintenance; `0e1795e` `da62b3b` `f72b34a` overlay-persist fixes.
 - Library flag `.tv90-maintenance` is the source of truth across overlay reboot.
+
+### T16
+
+- Status: done. Reviewer APPROVE (round 2). Orchestrator `make check`: 830 passed, coverage 99.14%.
+- Commits: `b57a6eb` e2e; `cd8bce2` OPERATIONS; `1bc3f9e` `e6a9ca8` review fixes.
