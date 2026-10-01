@@ -133,7 +133,7 @@ Run only in maintenance mode.
 | T14 | Maintenance tools: `tv90 tag` and `tv90 index` | T1, T2 | done |
 | T15 | Composition root, `90stv.service`, `setup.sh`, `tv90-maintenance on\|off` | T12, T13, T14 | in progress |
 | T16 | End-to-end tests with fakes; `docs/OPERATIONS.md` | T9, T15 | done |
-| T17 | Whole-repo review against full README and build prompt; fix findings | T16 | in progress |
+| T17 | Whole-repo review against full README and build prompt; fix findings | T16 | done |
 
 ## Cycle check
 
@@ -292,3 +292,10 @@ Update this file as tasks finish. Include implementer assumptions and the
 
 - Status: done. Reviewer APPROVE (round 2). Orchestrator `make check`: 830 passed, coverage 99.14%.
 - Commits: `b57a6eb` e2e; `cd8bce2` OPERATIONS; `1bc3f9e` `e6a9ca8` review fixes.
+
+### T17
+
+- Status: done. Reviewer APPROVE (round 2). Orchestrator `make check`: 836 passed, coverage 99.14%.
+- T17 fixes: dry-run tag cache read-only; leftover sample-library cache removed; e2e copy ignores cache.
+- Laptop-verified: `make check`, simulator (2024-07-15 CH 01–03; 2024-10-31 includes CH 04), tag dry-run on sample library.
+- Unverified on real Pi/TV: OPERATIONS hardware checks 1–8.
