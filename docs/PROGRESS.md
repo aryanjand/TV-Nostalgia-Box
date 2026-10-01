@@ -191,3 +191,9 @@ Statuses: pending | in progress | in review | done.
 
 Update this file as tasks finish. Include implementer assumptions and the
 `make check` result used for orchestrator verification.
+
+### T0
+
+- Status: done. Reviewer APPROVE. Orchestrator `make check`: 6 passed, domain/application coverage 100% (empty packages).
+- Commits: `266d5a1` docs README overrides; `d2181a0` chore scaffold; `dba98ab` docs DECISIONS.
+- Note: `make check` uses `.venv/bin` tools (uv-provisioned CPython 3.11.15).
