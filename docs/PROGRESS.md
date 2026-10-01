@@ -120,9 +120,9 @@ Run only in maintenance mode.
 | T1 | Configuration module (constants + env overrides); `Clock` port including trusted-time status, system and fake implementations | T0 | done |
 | T2 | Episode model, filename tag parser and formatter, library source port (filesystem and fake), `DurationIndex` and `MediaProber` ports (file-backed, ffprobe, and fakes) | T0 | done |
 | T3 | Time-of-day weight | T1, T2 | done |
-| T4 | Season mapping and season weight | T1, T2 | in progress |
-| T5 | Holiday calendar: constants table, env overrides, date rules, CH 04 windows, Layer A multiplier | T1, T2 | pending |
-| T6 | Recency weight | T1, T2 | pending |
+| T4 | Season mapping and season weight | T1, T2 | done |
+| T5 | Holiday calendar: constants table, env overrides, date rules, CH 04 windows, Layer A multiplier | T1, T2 | done |
+| T6 | Recency weight | T1, T2 | in progress |
 | T7 | Combined weight and seeded daily timeline builder with sign-on and night lock | T3, T4, T5, T6 | pending |
 | T8 | Channel lineup with ghost channel and wrap rules; "airing now" resolver (file plus offset) | T5, T7 | pending |
 | T9 | Schedule simulator CLI: `python -m tv90 simulate --date YYYY-MM-DD` | T8 | pending |
@@ -221,3 +221,9 @@ Update this file as tasks finish. Include implementer assumptions and the
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 410 passed, coverage 100%.
 - Commits: `20e495b` feat season weight; `ded1a79` docs.
 - Interface: `month_to_season(month)`, `SeasonWeight(settings).weight(episode, month)`.
+
+### T5
+
+- Status: done. Reviewer APPROVE. Orchestrator `make check`: 471 passed, coverage 100%.
+- Commits: `02f6556` date rules; `e99129e` holiday calendar; `8c1de6b` docs.
+- Interface: `load_holiday_calendar(environ, settings)`, `HolidayCalendar.channel_four_open`, `active_holiday`, `layer_a_multiplier`.
