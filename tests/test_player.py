@@ -26,7 +26,9 @@ from tv90.adapters.mpv_ipc_player import (
     TUNER_OVERLAY_ID,
     MpvIpcError,
     MpvIpcPlayer,
+    MpvIpcSession,
     ass_bgr_from_hex,
+    connect_mpv_unix_socket,
     decode_mpv_ipc_response,
     encode_mpv_ipc_payload,
     mpv_spawn_arguments,
@@ -600,3 +602,122 @@ def test_decode_mpv_ipc_response_rejects_non_object() -> None:
 
 def test_ass_bgr_from_hex_swaps_to_mpv_order() -> None:
     assert ass_bgr_from_hex("#3A4A42") == "&H424A3A&"
+
+
+class ScriptedByteTransport:
+    def __init__(
+        self,
+        recv_chunks: list[bytes],
+        try_recv_chunks: list[bytes] | None = None,
+    ) -> None:
+        self.sent: list[bytes] = []
+        self._recv_chunks = list(recv_chunks)
+        self._try_recv_chunks = list(try_recv_chunks or [])
+        self.recv_calls = 0
+        self.try_recv_calls = 0
+
+    def sendall(self, data: bytes) -> None:
+        self.sent.append(data)
+
+    def recv(self, max_bytes: int) -> bytes:
+        self.recv_calls += 1
+        if not self._recv_chunks:
+            return b""
+        return self._recv_chunks.pop(0)[:max_bytes]
+
+    def try_recv(self, max_bytes: int) -> bytes:
+        self.try_recv_calls += 1
+        if not self._try_recv_chunks:
+            return b""
+        return self._try_recv_chunks.pop(0)[:max_bytes]
+
+
+def test_mpv_session_keeps_bytes_after_first_newline() -> None:
+    transport = ScriptedByteTransport(
+        recv_chunks=[
+            b'{"error":"success"}\n{"event":"end-file","reason":"eof"}\n',
+        ]
+    )
+    session = MpvIpcSession(transport)
+
+    reply = session.send({"command": ["observe_property", 1, "eof-reached"]})
+
+    assert reply == {"error": "success"}
+    assert session.read_event() == {"event": "end-file", "reason": "eof"}
+    assert transport.recv_calls == 1
+    assert transport.try_recv_calls == 0
+
+
+def test_mpv_session_reuses_transport_for_later_commands() -> None:
+    transport = ScriptedByteTransport(
+        recv_chunks=[
+            b'{"error":"success"}\n',
+            b'{"error":"success"}\n',
+        ]
+    )
+    session = MpvIpcSession(transport)
+
+    session.send({"command": ["stop"]})
+    session.send({"command": ["stop"]})
+
+    assert len(transport.sent) == 2
+    assert transport.recv_calls == 2
+
+
+def test_connect_mpv_unix_socket_opens_transport_once() -> None:
+    transport = ScriptedByteTransport(
+        recv_chunks=[
+            b'{"error":"success"}\n',
+            b'{"error":"success"}\n',
+        ]
+    )
+    opened: list[str] = []
+
+    def open_transport(socket_path: str) -> ScriptedByteTransport:
+        opened.append(socket_path)
+        return transport
+
+    session = connect_mpv_unix_socket("/run/tv90/mpv.sock", open_transport)
+    session.send({"command": ["stop"]})
+    session.send({"command": ["stop"]})
+
+    assert opened == ["/run/tv90/mpv.sock"]
+    assert len(transport.sent) == 2
+
+
+def test_mpv_session_queues_events_arriving_before_a_reply() -> None:
+    transport = ScriptedByteTransport(
+        recv_chunks=[
+            b'{"event":"property-change","name":"eof-reached","data":true}\n'
+            b'{"error":"success"}\n',
+        ]
+    )
+    session = MpvIpcSession(transport)
+
+    reply = session.send({"command": ["loadfile", LITTLE_BEAR_FILENAME, "replace"]})
+
+    assert reply == {"error": "success"}
+    assert session.read_event() == {
+        "event": "property-change",
+        "name": "eof-reached",
+        "data": True,
+    }
+
+
+def test_mpv_session_read_event_uses_nonblocking_recv() -> None:
+    transport = ScriptedByteTransport(
+        recv_chunks=[b'{"error":"success"}\n'],
+        try_recv_chunks=[b'{"event":"end-file","reason":"eof"}\n'],
+    )
+    session = MpvIpcSession(transport)
+    session.send({"command": ["stop"]})
+
+    assert session.read_event() == {"event": "end-file", "reason": "eof"}
+    assert transport.try_recv_calls == 1
+
+
+def test_mpv_session_raises_when_socket_closes() -> None:
+    session = MpvIpcSession(ScriptedByteTransport(recv_chunks=[]))
+
+    with pytest.raises(MpvIpcError):
+        session.send({"command": ["stop"]})

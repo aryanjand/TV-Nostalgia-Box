@@ -7,6 +7,7 @@ import socket
 import subprocess
 import time
 from collections.abc import Callable, Mapping
+from typing import Protocol
 
 from tv90.config import CALM_SLATE_COLOR, Settings
 from tv90.ports.player import (
@@ -79,6 +80,97 @@ SOCKET_RECV_CHUNK_BYTES = 4096
 
 class MpvIpcError(Exception):
     """The injected or unix-socket IPC transport returned an unusable payload."""
+
+
+class MpvByteTransport(Protocol):
+    def sendall(self, data: bytes) -> None:
+        """Write one IPC request. Does not close the connection."""
+        ...
+
+    def recv(self, max_bytes: int) -> bytes:
+        """Blocking read used while waiting for a command reply."""
+        ...
+
+    def try_recv(self, max_bytes: int) -> bytes:
+        """Non-blocking read so T12 can poll events without sending a command."""
+        ...
+
+
+class MpvUnixSocketTransport:
+    def __init__(self, socket_path: str) -> None:
+        self._client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self._client.connect(socket_path)
+
+    def sendall(self, data: bytes) -> None:
+        self._client.sendall(data)
+
+    def recv(self, max_bytes: int) -> bytes:
+        return self._client.recv(max_bytes)
+
+    def try_recv(self, max_bytes: int) -> bytes:
+        self._client.setblocking(False)
+        try:
+            return self._client.recv(max_bytes)
+        except BlockingIOError:
+            return b""
+        finally:
+            self._client.setblocking(True)
+
+    def close(self) -> None:
+        self._client.close()
+
+
+class MpvIpcSession:
+    """Long-lived IPC client. One connection; leftover bytes stay in the buffer."""
+
+    def __init__(self, transport: MpvByteTransport) -> None:
+        self._transport = transport
+        self._buffer = bytearray()
+        self._events: list[dict[str, object]] = []
+
+    def send(self, payload: Mapping[str, object]) -> dict[str, object]:
+        self._transport.sendall(encode_mpv_ipc_payload(payload))
+        while True:
+            message = self._read_message()
+            if _is_ipc_event(message):
+                self._events.append(message)
+                continue
+            return message
+
+    def read_event(self) -> dict[str, object] | None:
+        if self._events:
+            return self._events.pop(0)
+        if not self._has_complete_line():
+            piece = self._transport.try_recv(SOCKET_RECV_CHUNK_BYTES)
+            if piece:
+                self._buffer.extend(piece)
+        if not self._has_complete_line():
+            return None
+        message = self._consume_line_object()
+        if _is_ipc_event(message):
+            return message
+        return None
+
+    def close(self) -> None:
+        if isinstance(self._transport, MpvUnixSocketTransport):
+            self._transport.close()
+
+    def _read_message(self) -> dict[str, object]:
+        while not self._has_complete_line():
+            piece = self._transport.recv(SOCKET_RECV_CHUNK_BYTES)
+            if piece == b"":
+                raise MpvIpcError("mpv IPC socket closed")
+            self._buffer.extend(piece)
+        return self._consume_line_object()
+
+    def _has_complete_line(self) -> bool:
+        return IPC_NEWLINE.encode(TEXT_ENCODING) in self._buffer
+
+    def _consume_line_object(self) -> dict[str, object]:
+        newline = IPC_NEWLINE.encode(TEXT_ENCODING)
+        line, remainder = bytes(self._buffer).split(newline, 1)
+        self._buffer[:] = remainder
+        return decode_mpv_ipc_response(line.decode(TEXT_ENCODING))
 
 
 class MpvIpcPlayer:
@@ -275,23 +367,12 @@ def spawn_mpv_process(socket_path: str, settings: Settings) -> subprocess.Popen[
     )
 
 
-def unix_socket_command_sender(socket_path: str) -> MpvIpcCommandSender:
-    """T15 collaborator. Tests inject a sender and never open a socket."""
-
-    def send(payload: Mapping[str, object]) -> Mapping[str, object]:
-        return send_mpv_ipc_over_unix_socket(socket_path, payload)
-
-    return send
-
-
-def send_mpv_ipc_over_unix_socket(
-    socket_path: str, payload: Mapping[str, object]
-) -> dict[str, object]:
-    """One request/response on a unix socket. T15 may wrap a persistent session."""
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
-        client.connect(socket_path)
-        client.sendall(encode_mpv_ipc_payload(payload))
-        return decode_mpv_ipc_response(_read_socket_line(client))
+def connect_mpv_unix_socket(
+    socket_path: str,
+    open_transport: Callable[[str], MpvByteTransport] = MpvUnixSocketTransport,
+) -> MpvIpcSession:
+    """T15 opens one persistent client. Tests inject a transport factory."""
+    return MpvIpcSession(open_transport(socket_path))
 
 
 def encode_mpv_ipc_payload(payload: Mapping[str, object]) -> bytes:
@@ -310,6 +391,10 @@ def decode_mpv_ipc_response(raw_line: str) -> dict[str, object]:
 
 def _osd_duration_milliseconds(seconds: float) -> int:
     return int(seconds * MILLISECONDS_PER_SECOND)
+
+
+def _is_ipc_event(message: Mapping[str, object]) -> bool:
+    return "event" in message
 
 
 def _event_reports_playback_ended(event: Mapping[str, object]) -> bool:
@@ -337,14 +422,3 @@ def _ass_rectangle(ass_color: str) -> str:
         f"m 0 0 l {OVERLAY_WIDTH} 0 {OVERLAY_WIDTH} {OVERLAY_HEIGHT} "
         f"0 {OVERLAY_HEIGHT}"
     )
-
-
-def _read_socket_line(client: socket.socket) -> str:
-    chunks = bytearray()
-    while IPC_NEWLINE.encode(TEXT_ENCODING) not in chunks:
-        piece = client.recv(SOCKET_RECV_CHUNK_BYTES)
-        if piece == b"":
-            raise MpvIpcError("mpv IPC socket closed")
-        chunks.extend(piece)
-    line, _remainder = bytes(chunks).split(IPC_NEWLINE.encode(TEXT_ENCODING), 1)
-    return line.decode(TEXT_ENCODING)
