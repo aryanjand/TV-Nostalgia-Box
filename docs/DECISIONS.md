@@ -84,3 +84,11 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Adjacent years.** Open-window and Layer A queries also consider year±1 so a lead that crosses 1 January still matches. `channel_four_window(holiday, year)` stays a single-year query.
 - **Layer A is tag + date, not show stem.** A `Holiday_` movie with `_CHRISTMAS` gets the same multiplier as a cartoon with that tag. T8 owns the CH 04 pool and whether that multiplier is applied on the ghost channel.
 - **No I/O.** Dates are injected. Environ is injected. Invalid years that cannot form a `date` raise `InvalidHolidayDateError`. A tag missing from a custom table raises `UnknownHolidayError`.
+
+## T6
+
+- **Public API:** `RecencyWeight(settings).weight(episode, recently_aired_filenames: Sequence[str]) -> float`. Identity is `episode.filename` (the file), not the show stem. No shared `WeightFactor` protocol; T7 will multiply independent parts.
+- **History order is chronological (oldest first).** The timeline being built appends each airing, so the last `recency_block_count` items are the newest. Tests construct tuples oldest-to-newest so `history[-3:]` is the block window. Most-recent-first was the alternative; chronological matches how the builder walks the day.
+- **`RECENCY_CLEAR_WEIGHT = 1.0` lives in `recency_weight.py`, not Settings.** Files outside the last `recency_penalty_count` airings, and empty history, return this identity. Block and penalty magnitudes stay on Settings (`recency_block_weight`, `recency_penalty_weight`). Same pattern as T5’s `UNTAGGED_LAYER_A_MULTIPLIER`.
+- **Strict R only.** A filename in the last 3 still returns `recency_block_weight` (0). T6 does not add `weight(..., relax_block=True)` or a second method. T7 relaxes empty-weight slots by passing a truncated history (omit the block window, then the penalty window) or a second class.
+- **No I/O, no clock, no random.** History is injected from the timeline being built. Only the last `recency_penalty_count` filenames matter for the penalty; last `recency_block_count` still block. A duplicate filename is blocked if any occurrence is in the last 3.
