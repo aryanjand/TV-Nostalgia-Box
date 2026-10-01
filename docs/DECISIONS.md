@@ -16,7 +16,7 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Volume resets to a configured default on every start.** Nothing is saved, so a power cycle must not remember the last level.
 - **setup.sh installs ffmpeg and cec-utils in addition to packages the README lists.** It enables network time sync and does not configure an outbound firewall.
 - **Runtime writes: none while the TV service runs.** Power-cut safety requires a read-only card; logs go to a volatile journal.
-- **Metadata source for the tagger: deferred to T14.** T14 must confirm coverage of Little Bear, Oswald, and Harry and His Bucket Full of Dinosaurs before building on a source.
+- **Metadata source for the tagger: deferred to T14.** T14 must confirm coverage of Little Bear, Oswald, and Harry and His Bucket Full of Dinosaurs before building on a source. T14 chose TVMaze.
 
 ## Toolchain (T0)
 
@@ -181,7 +181,7 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Metadata source: TVMaze (no API key).** Confirmed 2026-10-01 with GET `https://api.tvmaze.com/search/shows` and `https://api.tvmaze.com/shows/{id}/episodes`. Little Bear is show id 18005 (96 episodes, titles and HTML summaries). Oswald is 43569 (52 episodes, titles; `summary` is null). Harry and His Bucket Full of Dinosaurs is 69573 (48 episodes, titles; `summary` is null). One port; a missing summary is an empty description, not a not-found. Show ids are hardcoded so a search for "Oswald" cannot bind to the unrelated Disney+ in-development show. TVMaze numbers Little Bear as individual shorts (no season 3; seasons 4–5 have gaps); files whose `SxxExx` is absent are listed as not-found.
 - **Holiday movies skip `EpisodeMetadataSource.lookup`.** They have a title slug, not `SxxExx`. Title is the slug with `_` turned into spaces; description is empty; keyword matching still runs. Existing filename tags still win.
 - **Keyword matching is whole-word and case-insensitive.** Tokens are `[a-z0-9]+` from title plus description so `ice` cannot match `nice`. Extra spellings live in `src/tv90/data/keyword_rules.toml` (shipped with hatchling `force-include`, read via `importlib.resources`). Same-kind conflicts: existing filename tags of that kind are never replaced; among new matches, earlier rows in the TOML win.
-- **Cache file is `library/.tv90-metadata-cache.json`.** The TVMaze adapter writes the whole show catalog after a successful fetch. A second lookup (same process or a new source pointed at the same file) does not call HTTP. Corrupt cache is ignored and refetched. Hidden so the library scanner skips it.
+- **Cache file is `library/.tv90-metadata-cache.json`.** `--apply` may write the whole show catalog after a successful fetch. Dry-run / `preview_tags` uses a read-only cache (read if present, never write). A second lookup (same process or a new source pointed at the same file) does not call HTTP. Corrupt cache is ignored and refetched. Hidden so the library scanner skips it.
 - **HTTP getter is injected `(url, headers) -> text`.** Tests never open sockets. Production uses stdlib `urllib` with User-Agent `tv90/0.1 (90s Cable TV Nostalgia Box; maintenance tagger)`.
 - **`--apply` selects `apply_tags`, not a `dry_run` flag.** `preview_tags` never writes. `apply_tags` renames to `format_filename` (may reorder tags to canonical order) and leaves already-present tags alone. If the destination name already exists, that file is skipped and listed; it is not overwritten.
 - **`main(..., *, metadata_source=None, media_prober=None)`.** Optional keyword-only collaborators so tests never open sockets or spawn ffprobe. `run()` omits them and the CLI builds TVMaze + ffprobe.
@@ -217,5 +217,9 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Web remote in e2e** uses `create_remote_app` and GET `/`. Assertions are four buttons, four POST routes, Now Playing, and absent catalog paths. T13 remains the detailed remote suite.
 - **Metadata unused** is an exact `TelevisionCollaborators` field-name allowlist plus annotation scan. There is no metadata recorder to inject; a source constructed off to the side cannot fail. Playback collaborators stay clock, player, tv_power, library, duration index, settings, holiday calendar, library root, wait, optional logger.
 - **`docs/OPERATIONS.md` is parent-facing.** Hardware checks 1–8 are Pi/TV only. The requirement table maps each README §§2–5 bullet and the three README overrides to a test file or an OPERATIONS manual check.
+
+## T17
+
+- **Dry-run tagger is read-only including the metadata cache.** `python -m tv90 tag` without `--apply` may read `.tv90-metadata-cache.json` but must not create or update it. `--apply` may write the cache. E2E copies of `sample_library` ignore a leftover hidden cache so a laptop `tv90 tag` cannot fail the no-write assertion.
 
 
