@@ -56,3 +56,9 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Duration index file format:** UTF-8 JSON object mapping filename string → seconds (number). `FileDurationIndex` is read-only. `write_duration_index` exists for T14 maintenance and is a separate function, not a method on the index; runtime lookup must not call it.
 - **`DurationLookup` (application)** asks the index first; on `DurationUnknownError` it probes in memory and returns that duration. It never writes the index. Corrupt index values propagate and do not fall through to the prober.
 - **ffprobe invocation:** `ffprobe -v quiet -print_format json -show_format -- <filename>`. Duration is `format.duration` (string or number). The command runner is injected so tests never call real ffprobe. `--` keeps a leading-dash filename from being parsed as an option. The production runner times out after 30 seconds so a stuck probe cannot freeze kiosk start.
+
+## T3
+
+- **Public API:** `TimeOfDayWeight(settings).weight(episode, clock_hour) -> float`. No shared `WeightFactor` protocol; T7 will multiply independent parts.
+- **clock_hour range matches Settings:** `[MINIMUM_CLOCK_HOUR, MAXIMUM_CLOCK_HOUR]` i.e. 0.0 through 24.0 inclusive. 24.0 is midnight as hour 24, not wrapped to 0.0 — the Gaussian is not circular. Non-finite values and hours outside that range raise `InvalidClockHourError`.
+- **CH 04 is not special-cased.** W_time is only `Daypart` and `clock_hour`. A holiday movie with general daypart uses the same piecewise function as an untagged cartoon. T8 owns forcing time weight 1 when a movie has no daypart tag.
