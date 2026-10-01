@@ -43,4 +43,4 @@ mypy_path = "src"
 
 [tool.coverage.run]
 branch = true
-source = ["tv90.domain", "tv90.application"]
+source = ["tv90.domain", "tv90.application", "tv90.config"]

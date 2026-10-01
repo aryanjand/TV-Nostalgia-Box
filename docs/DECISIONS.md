@@ -26,3 +26,14 @@ Already-made choices. Do not reopen them without a new requirement.
 - **Makefile `check` invokes tools from `.venv/bin`.** `make check` does not depend on an already-activated shell.
 - **Ruff selects E, F, I, UP.** A small baseline until later tasks need more rules.
 - **Flask is pinned `>=3.0,<4` and is the only runtime dependency.** Unused libraries stay out of the runtime extra.
+
+## T1
+
+- **Sign-on and night lock are overridable** via `TV90_SIGN_ON` and `TV90_NIGHT_LOCK` as decimal hours (6.5 = 6:30 AM). The README's broadcast day is an example; a household may shift bedtime without a code edit.
+- **Episode join fade: 1.5 seconds.** Midpoint of the README's ~1–2 s range so joins feel like staying with the same friend, not a YouTube cut.
+- **Volume default on start: 40%.** Below the 65% ceiling. Nothing is saved across a pulled plug, so 40% is audible without blasting a toddler after a power cycle.
+- **Season multipliers: in-season 1.0, evergreen 0.20, wrong-season 0.05.** On a 1:1:1 mix of in-season, evergreen, and wrong-season files this is exactly 80% in-season (1 / 1.25). T4 maps months and verifies with a simulation.
+- **Meteorological month ranges are named constants** (Spring Mar–May, Summer Jun–Aug, Autumn Sep–Nov, Winter Dec–Feb). T4 owns the mapping function.
+- **Invalid environment values raise `InvalidSettingsError`.** A missing key keeps the default. Empty, non-numeric, negative lead days, or night lock at or before sign-on never fall back silently and never return None.
+- **`load_settings` takes an injected mapping.** It does not read `os.environ` at import time, so tests stay pure. T15 passes the real environment at the composition root.
+- **Coverage includes `tv90.config`.** Settings live outside domain/application; the 90% threshold is unchanged.
