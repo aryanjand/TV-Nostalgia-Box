@@ -107,6 +107,8 @@ def test_setup_script_is_resilient_about_existing_disk_network_health() -> None:
     assert "MIN_FREE_GIB_FULL_LIBRARY" in SETUP_SCRIPT
     assert "archive.org" in SETUP_SCRIPT
     assert "apt-get upgrade" not in SETUP_SCRIPT
+    assert "overlay_should_enable" in SETUP_SCRIPT
+    assert "skip overlay until" in SETUP_SCRIPT
 
 
 def test_unit_file_restarts_always_and_logs_to_journal() -> None:

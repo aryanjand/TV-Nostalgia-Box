@@ -388,6 +388,19 @@ overlay_is_active() {
   return 1
 }
 
+overlay_should_enable() {
+  if [[ "${IS_PI}" -ne 1 ]]; then
+    return 1
+  fi
+  if [[ "${SKIP_MEDIA}" -eq 1 ]]; then
+    return 0
+  fi
+  if [[ "$(count_health_hits)" -eq 3 && "$(count_bumper_channels)" -eq 3 ]]; then
+    return 0
+  fi
+  return 1
+}
+
 library_has_any_episode() {
   [[ -d "${LIBRARY_PATH}" ]] || return 1
   compgen -G "${LIBRARY_PATH}/*.mp4" >/dev/null \
@@ -739,7 +752,11 @@ main() {
     index_library
   fi
   if [[ "${IS_ROOT}" -eq 1 ]]; then
-    ensure_overlay
+    if overlay_should_enable; then
+      ensure_overlay
+    else
+      log "skip overlay until Little Bear, Oswald, Harry, and ch01–ch03 bumpers are present (re-run setup.sh after a full fetch, or use --skip-media)"
+    fi
   fi
   print_next_steps
   health_check
