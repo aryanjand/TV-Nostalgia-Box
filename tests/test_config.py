@@ -48,8 +48,8 @@ def test_load_settings_with_empty_environ_uses_documented_defaults() -> None:
     assert settings.osd_color == "#00FF00"
     assert settings.tuner_burst_milliseconds == 150
     assert settings.command_cooldown_milliseconds == 500
-    assert settings.volume_ceiling == 0.65
-    assert settings.volume_default == 0.40
+    assert settings.volume_ceiling == 0.85
+    assert settings.volume_default == 0.75
     assert settings.episode_join_fade_seconds == 1.5
     assert settings.layer_a_lead_days == 14
     assert settings.layer_a_lead_multiplier == 1.25

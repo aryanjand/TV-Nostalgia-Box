@@ -31,7 +31,7 @@ Already-made choices. Do not reopen them without a new requirement.
 
 - **Sign-on and night lock are overridable** via `TV90_SIGN_ON` and `TV90_NIGHT_LOCK` as decimal hours (6.5 = 6:30 AM). The README's broadcast day is an example; a household may shift bedtime without a code edit.
 - **Episode join fade: 1.5 seconds.** Midpoint of the README's ~1–2 s range so joins feel like staying with the same friend, not a YouTube cut.
-- **Volume default on start: 40%.** Below the 65% ceiling. Nothing is saved across a pulled plug, so 40% is audible without blasting a toddler after a power cycle.
+- **Volume default on start: 75%.** Ceiling is 85%. Nothing is saved across a pulled plug; power-on always returns to 75%.
 - **Season multipliers: in-season 1.0, evergreen 0.20, wrong-season 0.05.** On a 1:1:1 mix of in-season, evergreen, and wrong-season files this is exactly 80% in-season (1 / 1.25). T4 maps months and verifies with a simulation.
 - **Meteorological month ranges are named constants** (Spring Mar–May, Summer Jun–Aug, Autumn Sep–Nov, Winter Dec–Feb). T4 owns the mapping function.
 - **Invalid environment values raise `InvalidSettingsError`.** A missing key keeps the default. Empty, non-numeric, negative lead days, or night lock at or before sign-on never fall back silently and never return None.
@@ -156,7 +156,7 @@ Already-made choices. Do not reopen them without a new requirement.
 
 - **Public API:** `TelevisionController(TelevisionCollaborators)` with `tick()`, optional `run()`, `now_playing()`, `channel_up()`, `channel_down()`, `volume_up()`, `volume_down()`. Collaborators are a frozen role object (clock, player, tv_power, library, duration_index, settings, holiday_calendar, library_root, wait, optional TickLogger). No boolean `change(direction)` API.
 - **Tick-driven.** `tick()` is one step. Tests advance `FakeClock` and call `tick`. `run()` loops `tick` then injected `wait(TICK_INTERVAL_SECONDS)` (0.25 s). Tests never `time.sleep` and never use the real clock.
-- **Volume step is `VOLUME_STEP = 0.05`.** Clamp to `[0, settings.volume_ceiling]` (0.65). `show_volume_bar` after a successful change. Volume resets to `settings.volume_default` (0.40) on every power-on sync (first start and morning sign-on), not on channel change.
+- **Volume step is `VOLUME_STEP = 0.05`.** Clamp to `[0, settings.volume_ceiling]` (0.85). `show_volume_bar` after a successful change. Volume resets to `settings.volume_default` (0.75) on every power-on sync (first start and morning sign-on), not on channel change.
 - **Remote commands during untrusted wait:** ignore channel and volume until the clock gate opens *and* the set is in the broadcast day. Prefer simple: nothing to surf on the slate, and volume is not staged for later. Night lock and pre-sign-on also ignore both. Debounce is shared (500 ms via `Clock.now()`); elapsed `>= command_cooldown_milliseconds` is accepted; ignored presses do not refresh the timer.
 - **HDMI recovery:** `HDMI_LOAD_RETRY_COUNT = 2` extra tries (3 attempts total) with injected `wait(HDMI_RETRY_WAIT_SECONDS)` (1.0 s) between tries, then skip. Applies to `load`, `tune_to`, and `fade_to_next`. Tests inject a no-op wait. Never exit the kiosk.
 - **Episode join is wall-clock.** After EOF, `resolve_airing` again so a lag joins mid next file (live cable, not “play the next tape from 0”). Same-channel join is `fade_to_next`, never a tuner burst. Early EOF while still in the ended slot skips to the next timeline slot (offset 0 if that slot has not started). Night lock cuts the episode: standby + slate, no fade.
