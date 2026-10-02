@@ -31,6 +31,8 @@ def test_setup_script_uses_strict_bash() -> None:
 def test_setup_script_installs_required_packages() -> None:
     for package in REQUIRED_PACKAGES:
         assert package in SETUP_SCRIPT
+    assert "python3-venv" in SETUP_SCRIPT
+    assert "python3.11" not in SETUP_SCRIPT.split("APT_PACKAGES")[1].split(")")[0]
 
 
 def test_setup_script_sets_hostname_90stv() -> None:

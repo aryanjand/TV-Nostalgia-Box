@@ -49,7 +49,6 @@ APT_PACKAGES=(
   python3
   python3-venv
   python3-pip
-  python3.11
   avahi-daemon
   ffmpeg
 )
@@ -417,6 +416,11 @@ note_existing_install() {
 require_python3() {
   if ! have_cmd python3; then
     log "python3 is required"
+    exit 1
+  fi
+  # Bookworm ships 3.11; Trixie ships 3.13. Use distro python3, not a pinned package.
+  if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)'; then
+    log "python3 3.11 or newer is required (found $(python3 --version))"
     exit 1
   fi
 }
