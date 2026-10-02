@@ -505,6 +505,7 @@ def test_mpv_spawn_arguments_disable_watch_later_and_disk_cache() -> None:
     assert "--cache-pause=no" in arguments
     assert "--cache-on-disk=no" in arguments
     assert f"--input-ipc-server={socket_path}" in arguments
+    assert "--vo=drm" in arguments
 
 
 def test_mpv_observes_eof_reached_on_construction() -> None:
