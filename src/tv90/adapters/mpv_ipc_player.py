@@ -47,6 +47,9 @@ EOF_REASON = "eof"
 
 LOADFILE_COMMAND = "loadfile"
 LOADFILE_REPLACE_FLAG = "replace"
+# mpv 0.38+ takes insert-at index before options. A map in that slot
+# errors with "argument index has incompatible type" and never plays.
+LOADFILE_REPLACE_INDEX = -1
 LOADFILE_START_OPTION = "start"
 LOADFILE_VF_OPTION = "vf"
 LOADFILE_AF_OPTION = "af"
@@ -325,7 +328,15 @@ class MpvIpcPlayer:
             LOADFILE_START_OPTION: offset_seconds,
             **extra_options,
         }
-        self._send([LOADFILE_COMMAND, filename, LOADFILE_REPLACE_FLAG, options])
+        self._send(
+            [
+                LOADFILE_COMMAND,
+                filename,
+                LOADFILE_REPLACE_FLAG,
+                LOADFILE_REPLACE_INDEX,
+                options,
+            ]
+        )
 
     def _clear_overlays(self) -> None:
         self._clear_overlay(SLATE_OVERLAY_ID)
