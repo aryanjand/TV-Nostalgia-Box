@@ -17,8 +17,12 @@ RuntimeDirectory=90stv
 ExecStart=/opt/90stv/venv/bin/python3 -m tv90.main
 Restart=always
 RestartSec=2
+TTYPath=/dev/tty1
+StandardInput=tty
 StandardOutput=journal
 StandardError=journal
+TTYReset=yes
+TTYVHangup=yes
 
 [Install]
 WantedBy=multi-user.target

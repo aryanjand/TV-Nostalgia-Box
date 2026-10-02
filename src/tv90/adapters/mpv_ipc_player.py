@@ -386,12 +386,9 @@ def mpv_spawn_arguments(socket_path: str, settings: Settings) -> tuple[str, ...]
 
 def spawn_mpv_process(socket_path: str, settings: Settings) -> subprocess.Popen[bytes]:
     """T15 starts mpv. Tests never call this; development has no mpv binary."""
-    return subprocess.Popen(
-        mpv_spawn_arguments(socket_path, settings),
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    # Inherit stdio so --vo=drm can use the service TTY (HDMI). DEVNULL
+    # made IPC work while the set stayed black.
+    return subprocess.Popen(mpv_spawn_arguments(socket_path, settings))
 
 
 def connect_mpv_unix_socket(

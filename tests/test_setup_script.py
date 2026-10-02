@@ -80,6 +80,8 @@ def test_unit_file_restarts_always_and_logs_to_journal() -> None:
     assert "User=tv90" in UNIT_FILE
     assert "Environment=TV90_LIBRARY_PATH=/srv/90stv/library" in UNIT_FILE
     assert "StandardOutput=journal" in UNIT_FILE
+    assert "TTYPath=/dev/tty1" in UNIT_FILE
+    assert "StandardInput=tty" in UNIT_FILE
     assert "python3 -m tv90.main" in UNIT_FILE
     assert "ConditionPathExists=!/srv/90stv/library/.tv90-maintenance" in UNIT_FILE
     assert "StandardOutput=file:" not in UNIT_FILE
