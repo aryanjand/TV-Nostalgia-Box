@@ -18,10 +18,10 @@ HALLOWEEN_DATE = "2024-10-31"
 JULY_DATE = "2024-07-15"
 
 
-LITTLE_BEAR_ONE_JSON = json.dumps(
+KIPPER_ONE_JSON = json.dumps(
     [
         {
-            "name": "What Will Little Bear Wear?",
+            "name": "The Visitor",
             "season": 1,
             "number": 1,
             "summary": None,
@@ -102,7 +102,7 @@ def test_cli_halloween_sample_library_prints_ch01_and_ch04() -> None:
 
 
 def test_cli_does_not_write_to_the_library_directory(tmp_path: Path) -> None:
-    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
+    (tmp_path / "Kipper_S01E01.mp4").write_bytes(b"")
     (tmp_path / "Oswald_S01E01.mp4").write_bytes(b"")
     (tmp_path / "Harry_S01E01.mp4").write_bytes(b"")
     before = _fingerprint(tmp_path)
@@ -120,7 +120,7 @@ def test_cli_uses_injected_environ_not_process_environment(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("TV90_SIGN_ON", "6.5")
-    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
+    (tmp_path / "Kipper_S01E01.mp4").write_bytes(b"")
 
     exit_code, output = _run(
         ["simulate", "--date", JULY_DATE, "--library", str(tmp_path)],
@@ -133,7 +133,7 @@ def test_cli_uses_injected_environ_not_process_environment(
 
 
 def test_cli_reads_duration_index_when_present(tmp_path: Path) -> None:
-    filename = "LittleBear_S01E01.mp4"
+    filename = "Kipper_S01E01.mp4"
     (tmp_path / filename).write_bytes(b"")
     write_duration_index(tmp_path / "duration-index.json", {filename: 3600.0})
 
@@ -158,8 +158,8 @@ def test_cli_missing_library_directory_returns_error(tmp_path: Path) -> None:
 
 
 def test_cli_tag_dry_run_does_not_write_metadata_cache(tmp_path: Path) -> None:
-    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
-    http = RecordingHttpGetter(LITTLE_BEAR_ONE_JSON)
+    (tmp_path / "Kipper_S01E01.mp4").write_bytes(b"")
+    http = RecordingHttpGetter(KIPPER_ONE_JSON)
 
     exit_code, _output = _run(["tag", "--library", str(tmp_path)], http_get=http)
 
@@ -169,8 +169,8 @@ def test_cli_tag_dry_run_does_not_write_metadata_cache(tmp_path: Path) -> None:
 
 
 def test_cli_tag_apply_may_write_metadata_cache(tmp_path: Path) -> None:
-    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
-    http = RecordingHttpGetter(LITTLE_BEAR_ONE_JSON)
+    (tmp_path / "Kipper_S01E01.mp4").write_bytes(b"")
+    http = RecordingHttpGetter(KIPPER_ONE_JSON)
 
     exit_code, _output = _run(
         ["tag", "--apply", "--library", str(tmp_path)], http_get=http
@@ -182,10 +182,10 @@ def test_cli_tag_apply_may_write_metadata_cache(tmp_path: Path) -> None:
 
 
 def test_cli_tag_dry_run_renames_nothing(tmp_path: Path) -> None:
-    path = tmp_path / "LittleBear_S01E01.mp4"
+    path = tmp_path / "Kipper_S01E01.mp4"
     path.write_bytes(b"video")
     source = FakeEpisodeMetadataSource(
-        {("LittleBear", 1, 1): EpisodeMetadata("Snow Day", "ice on the sled")}
+        {("Kipper", 1, 1): EpisodeMetadata("Snow Day", "ice on the sled")}
     )
 
     exit_code, output = _run(
@@ -195,16 +195,16 @@ def test_cli_tag_dry_run_renames_nothing(tmp_path: Path) -> None:
     assert exit_code == 0
     assert path.exists()
     assert path.read_bytes() == b"video"
-    assert "LittleBear_S01E01.mp4" in output
+    assert "Kipper_S01E01.mp4" in output
     assert "WINTER" in output
     assert "Snow Day" in output
 
 
 def test_cli_tag_apply_renames_correctly(tmp_path: Path) -> None:
-    path = tmp_path / "LittleBear_S01E01.mp4"
+    path = tmp_path / "Kipper_S01E01.mp4"
     path.write_bytes(b"video")
     source = FakeEpisodeMetadataSource(
-        {("LittleBear", 1, 1): EpisodeMetadata("Snow Day", "ice on the sled")}
+        {("Kipper", 1, 1): EpisodeMetadata("Snow Day", "ice on the sled")}
     )
 
     exit_code, output = _run(
@@ -213,7 +213,7 @@ def test_cli_tag_apply_renames_correctly(tmp_path: Path) -> None:
 
     assert exit_code == 0
     assert not path.exists()
-    renamed = tmp_path / "LittleBear_S01E01_WINTER.mp4"
+    renamed = tmp_path / "Kipper_S01E01_WINTER.mp4"
     assert renamed.exists()
     assert renamed.read_bytes() == b"video"
     assert "WINTER" in output
@@ -222,10 +222,10 @@ def test_cli_tag_apply_renames_correctly(tmp_path: Path) -> None:
 def test_cli_tag_keeps_existing_morning_when_description_is_bedtime(
     tmp_path: Path,
 ) -> None:
-    path = tmp_path / "LittleBear_S01E01_MORNING.mp4"
+    path = tmp_path / "Kipper_S01E01_MORNING.mp4"
     path.write_bytes(b"")
     source = FakeEpisodeMetadataSource(
-        {("LittleBear", 1, 1): EpisodeMetadata("Moon", "bedtime sleep stars")}
+        {("Kipper", 1, 1): EpisodeMetadata("Moon", "bedtime sleep stars")}
     )
 
     exit_code, output = _run(
@@ -270,7 +270,7 @@ def test_cli_tag_unmatched_stays_untagged(tmp_path: Path) -> None:
 
 
 def test_cli_index_writes_json_without_ffprobe(tmp_path: Path) -> None:
-    filename = "LittleBear_S01E01.mp4"
+    filename = "Kipper_S01E01.mp4"
     media = tmp_path / filename
     media.write_bytes(b"")
     prober = FakeMediaProber({str(media): 99.5})
@@ -286,7 +286,7 @@ def test_cli_index_writes_json_without_ffprobe(tmp_path: Path) -> None:
 
 
 def test_cli_index_lists_probe_failures(tmp_path: Path) -> None:
-    good = tmp_path / "LittleBear_S01E01.mp4"
+    good = tmp_path / "Kipper_S01E01.mp4"
     bad = tmp_path / "Oswald_S01E01.mp4"
     good.write_bytes(b"")
     bad.write_bytes(b"")
@@ -299,7 +299,7 @@ def test_cli_index_lists_probe_failures(tmp_path: Path) -> None:
     assert "Oswald_S01E01.mp4" in output.split("Failed:")[1]
     assert (
         FileDurationIndex(tmp_path / "duration-index.json").duration_seconds(
-            "LittleBear_S01E01.mp4"
+            "Kipper_S01E01.mp4"
         )
         == 10.0
     )

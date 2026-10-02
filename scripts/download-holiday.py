@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Download CH 04 holiday specials from the Internet Archive.
 
-Layer A (Little Bear / Oswald / Harry episodes) is already in the show
+Layer A (Kipper / Oswald / Harry episodes) is already in the show
 downloads. Tag those with `python -m tv90 tag`. This script is Layer B only:
 standalone Holiday_*.mp4 files for the ghost channel.
 
@@ -289,7 +289,9 @@ def _get_json(url: str) -> dict[str, object]:
     except urllib.error.HTTPError as error:
         raise DownloadError(f"HTTP {error.code} fetching metadata") from error
     except urllib.error.URLError as error:
-        raise DownloadError(f"network error fetching metadata: {error.reason}") from error
+        raise DownloadError(
+            f"network error fetching metadata: {error.reason}"
+        ) from error
     except json.JSONDecodeError as error:
         raise DownloadError("archive.org metadata was not JSON") from error
     if not isinstance(payload, dict):

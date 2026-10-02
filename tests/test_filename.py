@@ -5,7 +5,7 @@ import pytest
 from tv90.config import (
     HARRY_SHOW_STEM,
     HOLIDAY_SHOW_STEM,
-    LITTLE_BEAR_SHOW_STEM,
+    KIPPER_SHOW_STEM,
     OSWALD_SHOW_STEM,
 )
 from tv90.domain.episode import (
@@ -76,12 +76,12 @@ def test_parse_cartoon_tag_cartesian_product(
     expected_holiday: HolidayTag | None,
 ) -> None:
     tags = daypart_tokens + season_tokens + holiday_tokens
-    name = _join_filename("LittleBear_S01E01", tags)
+    name = _join_filename("Kipper_S01E01", tags)
 
     episode = parse_filename(name)
 
     assert episode.filename == name
-    assert episode.show_stem == LITTLE_BEAR_SHOW_STEM
+    assert episode.show_stem == KIPPER_SHOW_STEM
     assert episode.season_number == 1
     assert episode.episode_number == 1
     assert episode.title_slug is None
@@ -142,8 +142,8 @@ def test_parse_harry_identity() -> None:
     assert episode.file_extension == "mkv"
 
 
-def test_parse_readme_little_bear_morning_winter() -> None:
-    episode = parse_filename("LittleBear_S01E04_MORNING_WINTER.mp4")
+def test_parse_readme_kipper_morning_winter() -> None:
+    episode = parse_filename("Kipper_S01E04_MORNING_WINTER.mp4")
 
     assert episode.season_number == 1
     assert episode.episode_number == 4
@@ -152,23 +152,23 @@ def test_parse_readme_little_bear_morning_winter() -> None:
 
 
 def test_day_normalizes_to_general_and_does_not_survive_format() -> None:
-    episode = parse_filename("LittleBear_S01E01_DAY.mp4")
+    episode = parse_filename("Kipper_S01E01_DAY.mp4")
 
     assert episode.daypart is Daypart.GENERAL
     formatted = format_filename(episode)
     assert "_DAY" not in formatted
-    assert formatted == "LittleBear_S01E01.mp4"
+    assert formatted == "Kipper_S01E01.mp4"
     assert parse_filename(formatted).daypart is Daypart.GENERAL
 
 
 def test_parse_accepts_tags_in_any_order() -> None:
-    morning_first = parse_filename("LittleBear_S01E04_MORNING_WINTER.mp4")
-    winter_first = parse_filename("LittleBear_S01E04_WINTER_MORNING.mp4")
+    morning_first = parse_filename("Kipper_S01E04_MORNING_WINTER.mp4")
+    winter_first = parse_filename("Kipper_S01E04_WINTER_MORNING.mp4")
 
     assert morning_first.daypart is winter_first.daypart is Daypart.MORNING
     assert morning_first.season_tag is winter_first.season_tag is SeasonTag.WINTER
-    assert format_filename(morning_first) == "LittleBear_S01E04_MORNING_WINTER.mp4"
-    assert format_filename(winter_first) == "LittleBear_S01E04_MORNING_WINTER.mp4"
+    assert format_filename(morning_first) == "Kipper_S01E04_MORNING_WINTER.mp4"
+    assert format_filename(winter_first) == "Kipper_S01E04_MORNING_WINTER.mp4"
 
 
 def test_parse_holiday_joins_multi_token_title_slug() -> None:
@@ -198,19 +198,19 @@ def test_format_omits_general_evergreen_and_missing_holiday() -> None:
     [
         pytest.param("", id="empty"),
         pytest.param("   ", id="whitespace"),
-        pytest.param("LittleBear_S01E01", id="missing-extension"),
-        pytest.param("LittleBear_S01E01.", id="empty-extension"),
+        pytest.param("Kipper_S01E01", id="missing-extension"),
+        pytest.param("Kipper_S01E01.", id="empty-extension"),
         pytest.param(".mp4", id="missing-stem"),
         pytest.param("Bluey_S01E01.mp4", id="unknown-stem"),
-        pytest.param("LittleBear_S01E01_FOO.mp4", id="unknown-tag"),
-        pytest.param("LittleBear_S01E01_MORNING_NIGHT.mp4", id="two-dayparts"),
-        pytest.param("LittleBear_S01E01_DAY_MORNING.mp4", id="day-and-morning"),
-        pytest.param("LittleBear_S01E01_SPRING_WINTER.mp4", id="two-seasons"),
-        pytest.param("LittleBear_S01E01_CHRISTMAS_EASTER.mp4", id="two-holidays"),
-        pytest.param("LittleBear_MORNING.mp4", id="cartoon-missing-identity"),
-        pytest.param("LittleBear.mp4", id="cartoon-stem-only"),
-        pytest.param("LittleBear_S01E01_S02E03.mp4", id="two-identities"),
-        pytest.param("LittleBear__S01E01.mp4", id="empty-token"),
+        pytest.param("Kipper_S01E01_FOO.mp4", id="unknown-tag"),
+        pytest.param("Kipper_S01E01_MORNING_NIGHT.mp4", id="two-dayparts"),
+        pytest.param("Kipper_S01E01_DAY_MORNING.mp4", id="day-and-morning"),
+        pytest.param("Kipper_S01E01_SPRING_WINTER.mp4", id="two-seasons"),
+        pytest.param("Kipper_S01E01_CHRISTMAS_EASTER.mp4", id="two-holidays"),
+        pytest.param("Kipper_MORNING.mp4", id="cartoon-missing-identity"),
+        pytest.param("Kipper.mp4", id="cartoon-stem-only"),
+        pytest.param("Kipper_S01E01_S02E03.mp4", id="two-identities"),
+        pytest.param("Kipper__S01E01.mp4", id="empty-token"),
         pytest.param("Holiday_S01E01_CHRISTMAS.mp4", id="holiday-with-sxxexx"),
         pytest.param("Holiday_CHRISTMAS.mp4", id="holiday-missing-slug"),
         pytest.param("Holiday_.mp4", id="holiday-empty-slug-token"),
@@ -230,7 +230,7 @@ def test_malformed_filename_error_includes_name_and_reason() -> None:
 
 
 def test_episode_is_frozen() -> None:
-    episode = parse_filename("LittleBear_S01E01.mp4")
+    episode = parse_filename("Kipper_S01E01.mp4")
 
     with pytest.raises(FrozenInstanceError):
         setattr(episode, "filename", "other.mp4")
@@ -240,7 +240,7 @@ def test_invalid_episode_rejects_empty_filename() -> None:
     with pytest.raises(InvalidEpisodeError):
         Episode(
             filename="",
-            show_stem=LITTLE_BEAR_SHOW_STEM,
+            show_stem=KIPPER_SHOW_STEM,
             season_number=1,
             episode_number=1,
             title_slug=None,
@@ -254,8 +254,8 @@ def test_invalid_episode_rejects_empty_filename() -> None:
 def test_invalid_episode_rejects_dotted_extension() -> None:
     with pytest.raises(InvalidEpisodeError):
         Episode(
-            filename="LittleBear_S01E01.mp4",
-            show_stem=LITTLE_BEAR_SHOW_STEM,
+            filename="Kipper_S01E01.mp4",
+            show_stem=KIPPER_SHOW_STEM,
             season_number=1,
             episode_number=1,
             title_slug=None,
@@ -269,8 +269,8 @@ def test_invalid_episode_rejects_dotted_extension() -> None:
 def test_invalid_episode_rejects_empty_extension() -> None:
     with pytest.raises(InvalidEpisodeError):
         Episode(
-            filename="LittleBear_S01E01.mp4",
-            show_stem=LITTLE_BEAR_SHOW_STEM,
+            filename="Kipper_S01E01.mp4",
+            show_stem=KIPPER_SHOW_STEM,
             season_number=1,
             episode_number=1,
             title_slug=None,
@@ -299,8 +299,8 @@ def test_invalid_episode_rejects_unknown_show_stem() -> None:
 def test_invalid_episode_rejects_cartoon_title_slug() -> None:
     with pytest.raises(InvalidEpisodeError):
         Episode(
-            filename="LittleBear_S01E01.mp4",
-            show_stem=LITTLE_BEAR_SHOW_STEM,
+            filename="Kipper_S01E01.mp4",
+            show_stem=KIPPER_SHOW_STEM,
             season_number=1,
             episode_number=1,
             title_slug="Picnic",
@@ -314,8 +314,8 @@ def test_invalid_episode_rejects_cartoon_title_slug() -> None:
 def test_invalid_episode_rejects_cartoon_without_numbers() -> None:
     with pytest.raises(InvalidEpisodeError):
         Episode(
-            filename="LittleBear_S01E01.mp4",
-            show_stem=LITTLE_BEAR_SHOW_STEM,
+            filename="Kipper_S01E01.mp4",
+            show_stem=KIPPER_SHOW_STEM,
             season_number=None,
             episode_number=None,
             title_slug=None,
@@ -329,8 +329,8 @@ def test_invalid_episode_rejects_cartoon_without_numbers() -> None:
 def test_invalid_episode_rejects_cartoon_missing_episode_number() -> None:
     with pytest.raises(InvalidEpisodeError):
         Episode(
-            filename="LittleBear_S01E01.mp4",
-            show_stem=LITTLE_BEAR_SHOW_STEM,
+            filename="Kipper_S01E01.mp4",
+            show_stem=KIPPER_SHOW_STEM,
             season_number=1,
             episode_number=None,
             title_slug=None,
@@ -344,8 +344,8 @@ def test_invalid_episode_rejects_cartoon_missing_episode_number() -> None:
 def test_invalid_episode_rejects_season_number_out_of_range() -> None:
     with pytest.raises(InvalidEpisodeError):
         Episode(
-            filename="LittleBear_S100E01.mp4",
-            show_stem=LITTLE_BEAR_SHOW_STEM,
+            filename="Kipper_S100E01.mp4",
+            show_stem=KIPPER_SHOW_STEM,
             season_number=100,
             episode_number=1,
             title_slug=None,
@@ -359,8 +359,8 @@ def test_invalid_episode_rejects_season_number_out_of_range() -> None:
 def test_invalid_episode_rejects_negative_episode_number() -> None:
     with pytest.raises(InvalidEpisodeError):
         Episode(
-            filename="LittleBear_S01E00.mp4",
-            show_stem=LITTLE_BEAR_SHOW_STEM,
+            filename="Kipper_S01E00.mp4",
+            show_stem=KIPPER_SHOW_STEM,
             season_number=1,
             episode_number=-1,
             title_slug=None,

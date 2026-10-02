@@ -12,7 +12,7 @@ from tv90.ports import LibrarySource
 
 
 def test_fake_library_returns_injected_episodes() -> None:
-    morning = parse_filename("LittleBear_S01E01_MORNING.mp4")
+    morning = parse_filename("Kipper_S01E01_MORNING.mp4")
     night = parse_filename("Oswald_S01E09_NIGHT.mp4")
     library = FakeLibrarySource(episodes=(morning, night))
 
@@ -29,75 +29,67 @@ def test_fake_library_returns_injected_unrecognized_names() -> None:
 
 def test_filesystem_library_lists_flat_media_files(tmp_path: Path) -> None:
     (tmp_path / "Oswald_S01E09_NIGHT.mp4").write_bytes(b"")
-    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
+    (tmp_path / "Kipper_S01E01.mp4").write_bytes(b"")
 
     library = FilesystemLibrarySource(tmp_path)
     episodes = library.episodes()
 
     assert [episode.filename for episode in episodes] == [
-        "LittleBear_S01E01.mp4",
+        "Kipper_S01E01.mp4",
         "Oswald_S01E09_NIGHT.mp4",
     ]
     assert library.unrecognized_filenames() == ()
 
 
 def test_filesystem_library_skips_hidden_files(tmp_path: Path) -> None:
-    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
+    (tmp_path / "Kipper_S01E01.mp4").write_bytes(b"")
     (tmp_path / ".Harry_S01E01.mp4").write_bytes(b"")
 
     library = FilesystemLibrarySource(tmp_path)
 
-    assert [episode.filename for episode in library.episodes()] == [
-        "LittleBear_S01E01.mp4"
-    ]
+    assert [episode.filename for episode in library.episodes()] == ["Kipper_S01E01.mp4"]
     assert library.unrecognized_filenames() == ()
 
 
 def test_filesystem_library_does_not_recurse_into_subfolders(tmp_path: Path) -> None:
-    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
+    (tmp_path / "Kipper_S01E01.mp4").write_bytes(b"")
     nested = tmp_path / "nested"
     nested.mkdir()
     (nested / "Oswald_S01E01.mp4").write_bytes(b"")
 
     library = FilesystemLibrarySource(tmp_path)
 
-    assert [episode.filename for episode in library.episodes()] == [
-        "LittleBear_S01E01.mp4"
-    ]
+    assert [episode.filename for episode in library.episodes()] == ["Kipper_S01E01.mp4"]
 
 
 def test_filesystem_library_collects_malformed_media_as_unrecognized(
     tmp_path: Path,
 ) -> None:
-    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
+    (tmp_path / "Kipper_S01E01.mp4").write_bytes(b"")
     (tmp_path / "garbage.mp4").write_bytes(b"")
     (tmp_path / "Holiday_S01E01.mkv").write_bytes(b"")
 
     library = FilesystemLibrarySource(tmp_path)
 
-    assert [episode.filename for episode in library.episodes()] == [
-        "LittleBear_S01E01.mp4"
-    ]
+    assert [episode.filename for episode in library.episodes()] == ["Kipper_S01E01.mp4"]
     assert library.unrecognized_filenames() == ("Holiday_S01E01.mkv", "garbage.mp4")
 
 
 def test_filesystem_library_ignores_non_media_files(tmp_path: Path) -> None:
-    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
+    (tmp_path / "Kipper_S01E01.mp4").write_bytes(b"")
     (tmp_path / "notes.txt").write_bytes(b"")
     (tmp_path / "readme").write_bytes(b"")
 
     library = FilesystemLibrarySource(tmp_path)
 
-    assert [episode.filename for episode in library.episodes()] == [
-        "LittleBear_S01E01.mp4"
-    ]
+    assert [episode.filename for episode in library.episodes()] == ["Kipper_S01E01.mp4"]
     assert library.unrecognized_filenames() == ()
 
 
 def test_filesystem_library_accepts_mp4_mkv_avi_case_insensitively(
     tmp_path: Path,
 ) -> None:
-    (tmp_path / "LittleBear_S01E01.MP4").write_bytes(b"")
+    (tmp_path / "Kipper_S01E01.MP4").write_bytes(b"")
     (tmp_path / "Oswald_S01E02.mkv").write_bytes(b"")
     (tmp_path / "Harry_S01E03.AVI").write_bytes(b"")
 
@@ -106,13 +98,13 @@ def test_filesystem_library_accepts_mp4_mkv_avi_case_insensitively(
 
     assert filenames == [
         "Harry_S01E03.AVI",
-        "LittleBear_S01E01.MP4",
+        "Kipper_S01E01.MP4",
         "Oswald_S01E02.mkv",
     ]
 
 
 def test_filesystem_library_skips_directories_named_like_media(tmp_path: Path) -> None:
-    (tmp_path / "LittleBear_S01E01.mp4").mkdir()
+    (tmp_path / "Kipper_S01E01.mp4").mkdir()
     (tmp_path / "Oswald_S01E01.mp4").write_bytes(b"")
 
     library = FilesystemLibrarySource(tmp_path)
@@ -121,7 +113,7 @@ def test_filesystem_library_skips_directories_named_like_media(tmp_path: Path) -
 
 
 def test_filesystem_library_does_not_write(tmp_path: Path) -> None:
-    media = tmp_path / "LittleBear_S01E01.mp4"
+    media = tmp_path / "Kipper_S01E01.mp4"
     media.write_bytes(b"")
     before_names = sorted(path.name for path in tmp_path.iterdir())
     before_mtime = media.stat().st_mtime_ns
@@ -163,7 +155,7 @@ def test_filesystem_library_rejects_file_path(tmp_path: Path) -> None:
 
 
 def test_library_adapters_satisfy_library_source_protocol(tmp_path: Path) -> None:
-    (tmp_path / "LittleBear_S01E01.mp4").write_bytes(b"")
+    (tmp_path / "Kipper_S01E01.mp4").write_bytes(b"")
     libraries: list[LibrarySource] = [
         FakeLibrarySource(),
         FilesystemLibrarySource(tmp_path),

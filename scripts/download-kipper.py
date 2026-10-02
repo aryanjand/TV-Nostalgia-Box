@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Download Little Bear originals from the Internet Archive and rename them.
+"""Download Kipper originals from the Internet Archive and rename them.
 
 Source item:
-  https://archive.org/details/little-bear-4x-11-the-little-bear-movie
+  https://archive.org/details/s-01-e-09-snowy-day_202311
 
-Each archive file is a broadcast half-hour (usually three shorts). This script
-keeps that numbering: Little Bear 1x01 … becomes LittleBear_S01E01.mp4.
+Remote names look like S01E01 - The Visitor.mp4 (season/episode then title).
+This script keeps SxxExx and prefixes Kipper_; the title is ignored so tags
+come from the tagger.
 
 Usage:
-  python3 scripts/download-little-bear.py --dry-run
-  python3 scripts/download-little-bear.py --dest ~/Downloads/little-bear
+  python3 scripts/download-kipper.py --dry-run
+  python3 scripts/download-kipper.py --dest ~/Downloads/kipper
 """
 
 from __future__ import annotations
@@ -25,12 +26,12 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-IDENTIFIER = "little-bear-4x-11-the-little-bear-movie"
+IDENTIFIER = "s-01-e-09-snowy-day_202311"
 METADATA_URL = f"https://archive.org/metadata/{IDENTIFIER}"
 DOWNLOAD_BASE = f"https://archive.org/download/{IDENTIFIER}"
-USER_AGENT = "tv90-little-bear-download/1.0 (personal library; +https://archive.org)"
+USER_AGENT = "tv90-kipper-download/1.0 (personal library; +https://archive.org)"
 CHUNK_SIZE = 1024 * 1024
-BROADCAST_NAME = re.compile(r"^Little Bear (\d+)x(\d+)\b", re.IGNORECASE)
+BROADCAST_NAME = re.compile(r"^S(\d{2})E(\d{2}).*\.mp4$", re.IGNORECASE)
 SUCCESS_EXIT_CODE = 0
 FAILURE_EXIT_CODE = 1
 
@@ -93,13 +94,13 @@ def main(argv: list[str] | None = None) -> int:
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Download Little Bear MPEG4 originals from archive.org."
+        description="Download Kipper MPEG4 originals from archive.org."
     )
     parser.add_argument(
         "--dest",
         type=Path,
-        default=Path("downloads/little-bear"),
-        help="folder for LittleBear_SxxExx.mp4 files (default: downloads/little-bear)",
+        default=Path("downloads/kipper"),
+        help="folder for Kipper_SxxExx.mp4 files (default: downloads/kipper)",
     )
     parser.add_argument(
         "--dry-run",
@@ -152,12 +153,12 @@ def _is_original_mpeg4(file_info: dict[object, object]) -> bool:
 
 
 def _library_filename(remote_name: str) -> str | None:
-    match = BROADCAST_NAME.match(Path(remote_name).name)
+    match = BROADCAST_NAME.fullmatch(Path(remote_name).name)
     if match is None:
         return None
     season = int(match.group(1))
     episode = int(match.group(2))
-    return f"LittleBear_S{season:02d}E{episode:02d}.mp4"
+    return f"Kipper_S{season:02d}E{episode:02d}.mp4"
 
 
 def _download_episode(episode: RemoteEpisode, dest: Path, prefix: str) -> None:
@@ -191,7 +192,6 @@ def _download_episode(episode: RemoteEpisode, dest: Path, prefix: str) -> None:
                     handle.write(chunk)
                     written += len(chunk)
             if written < expected_remaining and status != 206:
-                # A 200 restart writes the whole file; a short body is a failure.
                 if dest.stat().st_size != episode.size_bytes:
                     raise DownloadError(
                         f"short download: got {dest.stat().st_size}, "
@@ -226,7 +226,9 @@ def _get_json(url: str) -> dict[str, object]:
     except urllib.error.HTTPError as error:
         raise DownloadError(f"HTTP {error.code} fetching metadata") from error
     except urllib.error.URLError as error:
-        raise DownloadError(f"network error fetching metadata: {error.reason}") from error
+        raise DownloadError(
+            f"network error fetching metadata: {error.reason}"
+        ) from error
     except json.JSONDecodeError as error:
         raise DownloadError("archive.org metadata was not JSON") from error
     if not isinstance(payload, dict):

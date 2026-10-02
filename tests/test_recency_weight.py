@@ -7,18 +7,18 @@ from tv90.domain.recency_weight import RECENCY_CLEAR_WEIGHT, RecencyWeight
 # Chronological timeline (oldest first). The scheduler appends each airing, so
 # the last three items are the recency block and the last ten are the penalty
 # window. Slot 01 is the 11th-most-recent file and sits outside both windows.
-SLOT_01_OLDEST = parse_filename("LittleBear_S01E01.mp4")
-SLOT_02 = parse_filename("LittleBear_S01E02.mp4")
-SLOT_03 = parse_filename("LittleBear_S01E03.mp4")
-SLOT_04 = parse_filename("LittleBear_S01E04.mp4")
-SLOT_05 = parse_filename("LittleBear_S01E05.mp4")
-SLOT_06 = parse_filename("LittleBear_S01E06.mp4")
-SLOT_07 = parse_filename("LittleBear_S01E07.mp4")
-SLOT_08 = parse_filename("LittleBear_S01E08.mp4")
-SLOT_09 = parse_filename("LittleBear_S01E09.mp4")
-SLOT_10 = parse_filename("LittleBear_S01E10.mp4")
-SLOT_11_NEWEST = parse_filename("LittleBear_S01E11.mp4")
-UNSEEN_SAME_SHOW = parse_filename("LittleBear_S01E99.mp4")
+SLOT_01_OLDEST = parse_filename("Kipper_S01E01.mp4")
+SLOT_02 = parse_filename("Kipper_S01E02.mp4")
+SLOT_03 = parse_filename("Kipper_S01E03.mp4")
+SLOT_04 = parse_filename("Kipper_S01E04.mp4")
+SLOT_05 = parse_filename("Kipper_S01E05.mp4")
+SLOT_06 = parse_filename("Kipper_S01E06.mp4")
+SLOT_07 = parse_filename("Kipper_S01E07.mp4")
+SLOT_08 = parse_filename("Kipper_S01E08.mp4")
+SLOT_09 = parse_filename("Kipper_S01E09.mp4")
+SLOT_10 = parse_filename("Kipper_S01E10.mp4")
+SLOT_11_NEWEST = parse_filename("Kipper_S01E11.mp4")
+UNSEEN_SAME_SHOW = parse_filename("Kipper_S01E99.mp4")
 UNSEEN_OTHER_SHOW = parse_filename("Oswald_S01E01.mp4")
 
 ELEVEN_SLOT_TIMELINE = (

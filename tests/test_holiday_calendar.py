@@ -21,11 +21,11 @@ from tv90.domain.holiday_calendar import (
 )
 from tv90.domain.holiday_dates import canadian_thanksgiving, western_easter_sunday
 
-HALLOWEEN_CARTOON = parse_filename("LittleBear_S01E01_HALLOWEEN.mp4")
+HALLOWEEN_CARTOON = parse_filename("Kipper_S01E01_HALLOWEEN.mp4")
 THANKSGIVING_CARTOON = parse_filename("Oswald_S01E02_THANKSGIVING.mp4")
 CHRISTMAS_CARTOON = parse_filename("Harry_S01E03_CHRISTMAS.mp4")
-EASTER_CARTOON = parse_filename("LittleBear_S01E04_EASTER.mp4")
-UNTAGGED_CARTOON = parse_filename("LittleBear_S01E05.mp4")
+EASTER_CARTOON = parse_filename("Kipper_S01E04_EASTER.mp4")
+UNTAGGED_CARTOON = parse_filename("Kipper_S01E05.mp4")
 CHRISTMAS_MOVIE = parse_filename("Holiday_Rudolph_CHRISTMAS.mp4")
 
 YEAR_2023 = 2023

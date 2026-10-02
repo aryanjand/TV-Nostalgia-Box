@@ -9,7 +9,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Protocol
 
-from tv90.config import LITTLE_BEAR_CHANNEL_NUMBER, Settings
+from tv90.config import KIPPER_CHANNEL_NUMBER, Settings
 from tv90.domain.airing import Airing, OutsideBroadcastDay, Station, resolve_airing
 from tv90.domain.broadcast_day import broadcast_day_contains
 from tv90.domain.duration import (
@@ -107,7 +107,7 @@ class TelevisionController:
             collaborators.holiday_calendar,
             collaborators.duration_index,
         )
-        self._channel_number = LITTLE_BEAR_CHANNEL_NUMBER
+        self._channel_number = KIPPER_CHANNEL_NUMBER
         self._volume = collaborators.settings.volume_default
         self._mode = ControllerMode.WAITING_FOR_CLOCK
         self._wait_started_at: datetime | None = None

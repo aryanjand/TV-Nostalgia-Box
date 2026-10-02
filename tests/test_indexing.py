@@ -8,12 +8,12 @@ from tv90.adapters.file_duration_index import FileDurationIndex, write_duration_
 from tv90.application.indexing import index_library_durations
 from tv90.domain.duration import DurationUnknownError, ProbeFailedError
 
-LITTLE_BEAR = "LittleBear_S01E01.mp4"
+KIPPER = "Kipper_S01E01.mp4"
 OSWALD = "Oswald_S01E01.mp4"
 
 
 def test_index_writes_json_using_fake_prober(tmp_path: Path) -> None:
-    little = tmp_path / LITTLE_BEAR
+    little = tmp_path / KIPPER
     oswald = tmp_path / OSWALD
     little.write_bytes(b"")
     oswald.write_bytes(b"")
@@ -25,14 +25,14 @@ def test_index_writes_json_using_fake_prober(tmp_path: Path) -> None:
     )
 
     index = FileDurationIndex(index_path)
-    assert index.duration_seconds(LITTLE_BEAR) == 125.5
+    assert index.duration_seconds(KIPPER) == 125.5
     assert index.duration_seconds(OSWALD) == 88.0
-    assert result.written_filenames == (LITTLE_BEAR, OSWALD)
+    assert result.written_filenames == (KIPPER, OSWALD)
     assert result.failed_filenames == ()
 
 
 def test_index_does_not_use_real_ffprobe(tmp_path: Path) -> None:
-    media = tmp_path / LITTLE_BEAR
+    media = tmp_path / KIPPER
     media.write_bytes(b"")
     index_path = tmp_path / "duration-index.json"
 
@@ -46,12 +46,12 @@ def test_index_does_not_use_real_ffprobe(tmp_path: Path) -> None:
         forbidden_write,
     )
 
-    assert result.written_filenames == (LITTLE_BEAR,)
-    assert FileDurationIndex(index_path).duration_seconds(LITTLE_BEAR) == 40.0
+    assert result.written_filenames == (KIPPER,)
+    assert FileDurationIndex(index_path).duration_seconds(KIPPER) == 40.0
 
 
 def test_index_omits_probe_failures_and_lists_them(tmp_path: Path) -> None:
-    good = tmp_path / LITTLE_BEAR
+    good = tmp_path / KIPPER
     bad = tmp_path / OSWALD
     good.write_bytes(b"")
     bad.write_bytes(b"")
@@ -62,15 +62,15 @@ def test_index_omits_probe_failures_and_lists_them(tmp_path: Path) -> None:
         (good, bad), prober, index_path, write_duration_index
     )
 
-    assert result.written_filenames == (LITTLE_BEAR,)
+    assert result.written_filenames == (KIPPER,)
     assert result.failed_filenames == (OSWALD,)
-    assert FileDurationIndex(index_path).duration_seconds(LITTLE_BEAR) == 12.0
+    assert FileDurationIndex(index_path).duration_seconds(KIPPER) == 12.0
     with pytest.raises(DurationUnknownError):
         FileDurationIndex(index_path).duration_seconds(OSWALD)
 
 
 def test_index_keys_are_basenames_not_full_paths(tmp_path: Path) -> None:
-    media = tmp_path / LITTLE_BEAR
+    media = tmp_path / KIPPER
     media.write_bytes(b"")
     index_path = tmp_path / "duration-index.json"
 
@@ -81,7 +81,7 @@ def test_index_keys_are_basenames_not_full_paths(tmp_path: Path) -> None:
         write_duration_index,
     )
 
-    assert LITTLE_BEAR in index_path.read_text(encoding="utf-8")
+    assert KIPPER in index_path.read_text(encoding="utf-8")
     assert str(tmp_path) not in index_path.read_text(encoding="utf-8")
 
 

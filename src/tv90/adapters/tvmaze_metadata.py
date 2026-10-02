@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-from tv90.config import HARRY_SHOW_STEM, LITTLE_BEAR_SHOW_STEM, OSWALD_SHOW_STEM
+from tv90.config import HARRY_SHOW_STEM, KIPPER_SHOW_STEM, OSWALD_SHOW_STEM
 from tv90.ports.metadata import (
     EpisodeMetadata,
     EpisodeMetadataNotFoundError,
@@ -16,9 +16,9 @@ from tv90.ports.metadata import (
     HttpHeaders,
 )
 
-# Confirmed 2026-10-01 against api.tvmaze.com search + /shows/{id}/episodes.
+# Confirmed 2026-10-02 against api.tvmaze.com search + /shows/{id}/episodes.
 TVMAZE_SHOW_IDS = {
-    LITTLE_BEAR_SHOW_STEM: 18005,
+    KIPPER_SHOW_STEM: 18014,
     OSWALD_SHOW_STEM: 43569,
     HARRY_SHOW_STEM: 69573,
 }

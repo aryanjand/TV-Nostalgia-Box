@@ -12,10 +12,10 @@ from tv90.domain.season_weight import (
     month_to_season,
 )
 
-SPRING_EPISODE = parse_filename("LittleBear_S01E01_SPRING.mp4")
-SUMMER_EPISODE = parse_filename("LittleBear_S01E02_SUMMER.mp4")
-AUTUMN_EPISODE = parse_filename("LittleBear_S01E03_AUTUMN.mp4")
-WINTER_EPISODE = parse_filename("LittleBear_S01E04_WINTER.mp4")
+SPRING_EPISODE = parse_filename("Kipper_S01E01_SPRING.mp4")
+SUMMER_EPISODE = parse_filename("Kipper_S01E02_SUMMER.mp4")
+AUTUMN_EPISODE = parse_filename("Kipper_S01E03_AUTUMN.mp4")
+WINTER_EPISODE = parse_filename("Kipper_S01E04_WINTER.mp4")
 EVERGREEN_EPISODE = parse_filename("Oswald_S01E09.mp4")
 HOLIDAY_EVERGREEN_EPISODE = parse_filename("Holiday_Rudolph_CHRISTMAS.mp4")
 CHRISTMAS_WINTER_CARTOON = parse_filename("Harry_S01E01_WINTER_CHRISTMAS.mp4")

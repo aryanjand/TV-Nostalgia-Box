@@ -8,7 +8,7 @@ from typing import Any
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "download-interstitials.py"
 
-CARTOON_SLUGS = ("little_bear", "oswald", "harry")
+CARTOON_SLUGS = ("kipper", "oswald", "harry")
 CARTOON_FOLDERS = ("ch01", "ch02", "ch03")
 
 
@@ -40,7 +40,7 @@ def test_planner_lays_out_channel_folders_and_durations() -> None:
     plans = script.planned_bumpers()
     labels = {pack.label for pack in script.CHANNEL_PACKS}
 
-    assert labels == {"Little Bear", "Oswald", "Harry", "Holiday"}
+    assert labels == {"Kipper", "Oswald", "Harry", "Holiday"}
     assert script.DURATIONS_SECONDS == (16, 19, 23, 28, 32)
     assert min(script.DURATIONS_SECONDS) >= 15
     assert max(script.DURATIONS_SECONDS) > 30
@@ -49,7 +49,7 @@ def test_planner_lays_out_channel_folders_and_durations() -> None:
     assert any(name.startswith("ch02/") for name in relatives)
     assert any(name.startswith("ch03/") for name in relatives)
     assert any(name.startswith("ch04/") for name in relatives)
-    assert any("little_bear" in name for name in relatives)
+    assert any("kipper" in name for name in relatives)
     assert any("oswald" in name for name in relatives)
     assert any("harry" in name for name in relatives)
     assert any("holiday" in name for name in relatives)
@@ -72,28 +72,26 @@ def _video_filter(script: Any, plan: Any) -> str:
 
 def test_cartoon_packs_animate_and_are_not_duration_clones() -> None:
     script = _load_script()
-    little = next(
-        plan for plan in script.planned_bumpers() if plan.slug == "little_bear"
-    )
+    kipper = next(plan for plan in script.planned_bumpers() if plan.slug == "kipper")
     oswald = next(plan for plan in script.planned_bumpers() if plan.slug == "oswald")
     harry = next(plan for plan in script.planned_bumpers() if plan.slug == "harry")
-    little_filter = _video_filter(script, little)
+    kipper_filter = _video_filter(script, kipper)
     oswald_filter = _video_filter(script, oswald)
     harry_filter = _video_filter(script, harry)
 
-    assert little.color != oswald.color
+    assert kipper.color != oswald.color
     assert oswald.color != harry.color
-    assert little.color != harry.color
-    assert little.accent != oswald.accent
+    assert kipper.color != harry.color
+    assert kipper.accent != oswald.accent
     assert oswald.accent != harry.accent
-    assert little.accent != harry.accent
-    assert "hue=" in little_filter
-    assert "fade=" in little_filter
-    assert "drawtext=" in little_filter
-    assert little_filter != oswald_filter
+    assert kipper.accent != harry.accent
+    assert "hue=" in kipper_filter
+    assert "fade=" in kipper_filter
+    assert "drawtext=" in kipper_filter
+    assert kipper_filter != oswald_filter
     assert oswald_filter != harry_filter
-    assert little_filter != harry_filter
-    assert "Little Bear" in little_filter
+    assert kipper_filter != harry_filter
+    assert "Kipper" in kipper_filter
     assert "Oswald" in oswald_filter
     assert "Harry" in harry_filter
 
@@ -120,7 +118,7 @@ def test_dry_run_prints_dest_names_without_writing(tmp_path: Path, capsys: Any) 
     assert writes == []
     assert not dest.exists()
     assert "16s" in output
-    assert "Little Bear" in output
+    assert "Kipper" in output
 
 
 def test_write_then_skip_valid_existing(tmp_path: Path, capsys: Any) -> None:

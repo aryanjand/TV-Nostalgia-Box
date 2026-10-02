@@ -69,9 +69,9 @@ KIND_IDENT = BumperKind(
     fade_seconds=1.2,
     text_y_offset=0,
 )
-KIND_WOODS_BREAK = BumperKind(
+KIND_MEADOW_BREAK = BumperKind(
     token="be_right_back",
-    message_template="Woods break",
+    message_template="Meadow break",
     hue_scale=2.0,
     fade_seconds=0.8,
     text_y_offset=-36,
@@ -108,12 +108,12 @@ KIND_BACK_TO_SHOW = BumperKind(
 CHANNEL_PACKS: tuple[ChannelPack, ...] = (
     ChannelPack(
         channel_number=1,
-        label="Little Bear",
-        slug="little_bear",
-        color="0x6B8E4E",
-        accent="0xD5E6B8",
+        label="Kipper",
+        slug="kipper",
+        color="0xC4A574",
+        accent="0xF3E6C8",
         hue_degrees_per_second=8.0,
-        kinds=(KIND_IDENT, KIND_WOODS_BREAK, KIND_BACK_TO_SHOW),
+        kinds=(KIND_IDENT, KIND_MEADOW_BREAK, KIND_BACK_TO_SHOW),
         durations_seconds=DURATIONS_SECONDS,
     ),
     ChannelPack(

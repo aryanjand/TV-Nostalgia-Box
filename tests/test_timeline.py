@@ -19,8 +19,8 @@ from timeline_fingerprint_script import (
 from tv90.adapters.fake_duration import FakeDurationIndex
 from tv90.config import (
     HOLIDAY_CHANNEL_NUMBER,
-    LITTLE_BEAR_CHANNEL_NUMBER,
-    LITTLE_BEAR_SHOW_STEM,
+    KIPPER_CHANNEL_NUMBER,
+    KIPPER_SHOW_STEM,
     OSWALD_CHANNEL_NUMBER,
     OSWALD_SHOW_STEM,
     Settings,
@@ -50,8 +50,8 @@ NIGHT_DAYPART_EPISODE_COUNT = 5
 MORNING_DAYPART_FIRST_EPISODE = 11
 NIGHT_DAYPART_FIRST_EPISODE = 21
 TINY_POOL = (
-    parse_filename("LittleBear_S01E01.mp4"),
-    parse_filename("LittleBear_S01E02.mp4"),
+    parse_filename("Kipper_S01E01.mp4"),
+    parse_filename("Kipper_S01E02.mp4"),
 )
 LONG_MOVIE_POOL = (
     parse_filename("Holiday_Rudolph_CHRISTMAS.mp4"),
@@ -79,25 +79,25 @@ SRC_PATH = PROJECT_ROOT / "src"
 
 def _large_pool() -> tuple[Episode, ...]:
     return tuple(
-        parse_filename(f"LittleBear_S01E{episode_number:02d}.mp4")
+        parse_filename(f"Kipper_S01E{episode_number:02d}.mp4")
         for episode_number in range(1, LARGE_POOL_EPISODE_COUNT + 1)
     )
 
 
 def _daypart_pool() -> tuple[Episode, ...]:
     generals = tuple(
-        parse_filename(f"LittleBear_S01E{episode_number:02d}.mp4")
+        parse_filename(f"Kipper_S01E{episode_number:02d}.mp4")
         for episode_number in range(1, GENERAL_DAYPART_EPISODE_COUNT + 1)
     )
     mornings = tuple(
-        parse_filename(f"LittleBear_S01E{episode_number:02d}_MORNING.mp4")
+        parse_filename(f"Kipper_S01E{episode_number:02d}_MORNING.mp4")
         for episode_number in range(
             MORNING_DAYPART_FIRST_EPISODE,
             MORNING_DAYPART_FIRST_EPISODE + MORNING_DAYPART_EPISODE_COUNT,
         )
     )
     nights = tuple(
-        parse_filename(f"LittleBear_S01E{episode_number:02d}_NIGHT.mp4")
+        parse_filename(f"Kipper_S01E{episode_number:02d}_NIGHT.mp4")
         for episode_number in range(
             NIGHT_DAYPART_FIRST_EPISODE,
             NIGHT_DAYPART_FIRST_EPISODE + NIGHT_DAYPART_EPISODE_COUNT,
@@ -132,7 +132,7 @@ def _builder(
 def _build(
     pool: Sequence[Episode],
     on_date: date = JULY_FIFTEENTH,
-    channel_number: int = LITTLE_BEAR_CHANNEL_NUMBER,
+    channel_number: int = KIPPER_CHANNEL_NUMBER,
     durations: Mapping[str, float] | None = None,
     settings: Settings | None = None,
 ) -> Timeline:
@@ -142,7 +142,7 @@ def _build(
 def test_slot_and_timeline_are_frozen() -> None:
     episode = TINY_POOL[0]
     slot = Slot.starting_at(episode, 6.5, HALF_HOUR_SECONDS)
-    timeline = Timeline(JULY_FIFTEENTH, LITTLE_BEAR_CHANNEL_NUMBER, (slot,))
+    timeline = Timeline(JULY_FIFTEENTH, KIPPER_CHANNEL_NUMBER, (slot,))
 
     with pytest.raises(FrozenInstanceError):
         setattr(slot, "start_hour", 7.0)
@@ -184,7 +184,7 @@ def test_empty_pool_returns_an_empty_timeline() -> None:
 
     assert timeline.slots == ()
     assert timeline.date == JULY_FIFTEENTH
-    assert timeline.channel_number == LITTLE_BEAR_CHANNEL_NUMBER
+    assert timeline.channel_number == KIPPER_CHANNEL_NUMBER
 
 
 def test_first_slot_starts_at_sign_on_and_none_start_at_or_after_night_lock() -> None:
@@ -252,7 +252,7 @@ def test_hashlib_seed_is_stable_across_processes() -> None:
 
 
 def test_missing_duration_is_not_swallowed() -> None:
-    pool = (parse_filename("LittleBear_S01E01.mp4"),)
+    pool = (parse_filename("Kipper_S01E01.mp4"),)
     builder = DailyTimelineBuilder(
         load_settings({}),
         HolidayCalendar.from_defaults(load_settings({})),
@@ -260,7 +260,7 @@ def test_missing_duration_is_not_swallowed() -> None:
     )
 
     with pytest.raises(DurationUnknownError) as caught:
-        builder.build(JULY_FIFTEENTH, LITTLE_BEAR_CHANNEL_NUMBER, pool)
+        builder.build(JULY_FIFTEENTH, KIPPER_CHANNEL_NUMBER, pool)
 
     assert caught.value.filename == pool[0].filename
 
@@ -322,21 +322,19 @@ def test_pick_without_recency_raises_when_the_pool_is_empty() -> None:
     builder = _builder(())
 
     with pytest.raises(UnfillableTimelineSlotError) as caught:
-        builder.pick_without_recency(
-            (), JULY_FIFTEENTH, LITTLE_BEAR_CHANNEL_NUMBER, 6.5
-        )
+        builder.pick_without_recency((), JULY_FIFTEENTH, KIPPER_CHANNEL_NUMBER, 6.5)
 
     assert caught.value.on_date == JULY_FIFTEENTH
-    assert caught.value.channel_number == LITTLE_BEAR_CHANNEL_NUMBER
+    assert caught.value.channel_number == KIPPER_CHANNEL_NUMBER
     assert caught.value.slot_start_hour == 6.5
 
 
-def test_oswald_pool_never_emits_little_bear() -> None:
+def test_oswald_pool_never_emits_kipper() -> None:
     timeline = _build(OSWALD_POOL, channel_number=OSWALD_CHANNEL_NUMBER)
 
     assert timeline.slots
     for slot in timeline.slots:
-        assert slot.episode.show_stem != LITTLE_BEAR_SHOW_STEM
+        assert slot.episode.show_stem != KIPPER_SHOW_STEM
         assert slot.episode.show_stem == OSWALD_SHOW_STEM
 
 
@@ -350,7 +348,7 @@ def test_mornings_skew_to_morning_files_and_evenings_to_night() -> None:
 
     for day_offset in range(SIMULATION_DAY_COUNT):
         on_date = SIMULATION_START_DATE + timedelta(days=day_offset)
-        timeline = builder.build(on_date, LITTLE_BEAR_CHANNEL_NUMBER, pool)
+        timeline = builder.build(on_date, KIPPER_CHANNEL_NUMBER, pool)
         for slot in timeline.slots:
             if slot.start_hour < settings.general_midday_start_hour:
                 morning_slots.append(slot)

@@ -37,7 +37,7 @@ from tv90.config import (
     COMMAND_COOLDOWN_MILLISECONDS,
     DEFAULT_CLOCK_TRUST_TIMEOUT_SECONDS,
     HARRY_CHANNEL_NUMBER,
-    LITTLE_BEAR_CHANNEL_NUMBER,
+    KIPPER_CHANNEL_NUMBER,
     OSWALD_CHANNEL_NUMBER,
     VOLUME_CEILING,
     VOLUME_DEFAULT,
@@ -69,20 +69,20 @@ ONE_HOUR_SECONDS = float(SECONDS_PER_HOUR)
 COOLDOWN = timedelta(milliseconds=COMMAND_COOLDOWN_MILLISECONDS)
 JUST_UNDER_COOLDOWN = timedelta(milliseconds=COMMAND_COOLDOWN_MILLISECONDS - 1)
 
-LITTLE_BEAR_ONE = parse_filename("LittleBear_S01E01.mp4")
-LITTLE_BEAR_TWO = parse_filename("LittleBear_S01E02.mp4")
+KIPPER_ONE = parse_filename("Kipper_S01E01.mp4")
+KIPPER_TWO = parse_filename("Kipper_S01E02.mp4")
 OSWALD_ONE = parse_filename("Oswald_S01E01.mp4")
 HARRY_ONE = parse_filename("Harry_S01E01.mp4")
 HALLOWEEN_MOVIE = parse_filename("Holiday_GreatPumpkin_HALLOWEEN.mp4")
 
-DAYTIME_LIBRARY = (LITTLE_BEAR_ONE, LITTLE_BEAR_TWO, OSWALD_ONE, HARRY_ONE)
+DAYTIME_LIBRARY = (KIPPER_ONE, KIPPER_TWO, OSWALD_ONE, HARRY_ONE)
 HOUR_DURATIONS = {episode.filename: ONE_HOUR_SECONDS for episode in DAYTIME_LIBRARY}
 CH01_BREAK_ONE = "ch01_break_a.mp4"
 CH01_BREAK_TWO = "ch01_break_b.mp4"
 CH01_BUMPERS = (CH01_BREAK_ONE, CH01_BREAK_TWO)
 CH01_PACK = (
-    "ch01/little_bear_ident_16s.mp4",
-    "ch01/little_bear_back_to_show_23s.mp4",
+    "ch01/kipper_ident_16s.mp4",
+    "ch01/kipper_back_to_show_23s.mp4",
 )
 CH02_PACK = (
     "ch02/oswald_ident_16s.mp4",
@@ -193,16 +193,16 @@ def _noop_wait(_seconds: float) -> None:
     return None
 
 
-def _little_bear_timeline(on_date: date) -> Timeline:
+def _kipper_timeline(on_date: date) -> Timeline:
     settings = load_settings({})
     index: DurationIndex = FakeDurationIndex(HOUR_DURATIONS)
     station = Station(settings, HolidayCalendar.from_defaults(settings), index)
-    return station.timeline(on_date, LITTLE_BEAR_CHANNEL_NUMBER, DAYTIME_LIBRARY)
+    return station.timeline(on_date, KIPPER_CHANNEL_NUMBER, DAYTIME_LIBRARY)
 
 
 def _airing_at(
     moment: datetime,
-    channel_number: int = LITTLE_BEAR_CHANNEL_NUMBER,
+    channel_number: int = KIPPER_CHANNEL_NUMBER,
     episodes: tuple[Episode, ...] = DAYTIME_LIBRARY,
     durations: dict[str, float] | None = None,
 ) -> Airing:
@@ -338,7 +338,7 @@ def test_untrusted_clock_starts_playback_after_timeout_with_unsynced_phrase(
     assert loads[-1].filename == expected.episode.filename
     assert loads[-1].offset_seconds == pytest.approx(expected.offset_seconds)
     assert NOW_PLAYING_CLOCK_NOT_SYNCED in controller.now_playing()
-    assert format_channel_banner(LITTLE_BEAR_CHANNEL_NUMBER) in controller.now_playing()
+    assert format_channel_banner(KIPPER_CHANNEL_NUMBER) in controller.now_playing()
     assert expected.episode.filename in controller.now_playing()
 
 
@@ -375,7 +375,7 @@ def test_mark_trusted_while_playing_retunes_and_drops_unsynced_phrase(
     assert tunes[-1].filename == expected.episode.filename
     assert tunes[-1].offset_seconds == pytest.approx(expected.offset_seconds)
     assert NOW_PLAYING_CLOCK_NOT_SYNCED not in controller.now_playing()
-    banner = format_channel_banner(LITTLE_BEAR_CHANNEL_NUMBER)
+    banner = format_channel_banner(KIPPER_CHANNEL_NUMBER)
     assert controller.now_playing() == f"{banner} {expected.episode.filename}"
 
 
@@ -407,7 +407,7 @@ def test_channel_wake_from_idle_loads_mid_episode_offset_and_resets_volume(
     assert SetVolumeCommand(VOLUME_DEFAULT) in player.commands
     assert any(
         isinstance(command, ShowChannelBannerCommand)
-        and command.channel_number == LITTLE_BEAR_CHANNEL_NUMBER
+        and command.channel_number == KIPPER_CHANNEL_NUMBER
         for command in player.commands
     )
     assert power.commands == ()
@@ -521,8 +521,8 @@ def test_end_of_file_join_uses_fade_to_next_not_tune(tmp_path: Path) -> None:
     clock = FakeClock.trusted(JULY_SIGN_ON)
     controller, _, player, _ = _controller(tmp_path, clock=clock)
     _wake(controller)
-    first_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[0]
-    second_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[1]
+    first_slot = _kipper_timeline(JULY_SIGN_ON.date()).slots[0]
+    second_slot = _kipper_timeline(JULY_SIGN_ON.date()).slots[1]
     assert _load_commands(player)[-1].filename == first_slot.episode.filename
     assert _load_commands(player)[-1].offset_seconds == pytest.approx(0.0)
 
@@ -558,7 +558,7 @@ def test_early_eof_skips_to_next_slot_with_fade(tmp_path: Path) -> None:
     covering = _airing_at(JULY_MORNING)
     later_slots = [
         slot
-        for slot in _little_bear_timeline(JULY_MORNING.date()).slots
+        for slot in _kipper_timeline(JULY_MORNING.date()).slots
         if slot.start_hour > covering.slot.start_hour
     ]
     player.mark_playback_ended()
@@ -658,8 +658,8 @@ def test_missing_duration_skips_file_and_plays_other_channel(tmp_path: Path) -> 
 
 def test_corrupt_duration_is_skipped_not_fatal(tmp_path: Path) -> None:
     durations = {
-        LITTLE_BEAR_ONE.filename: 0.0,
-        LITTLE_BEAR_TWO.filename: ONE_HOUR_SECONDS,
+        KIPPER_ONE.filename: 0.0,
+        KIPPER_TWO.filename: ONE_HOUR_SECONDS,
         OSWALD_ONE.filename: ONE_HOUR_SECONDS,
         HARRY_ONE.filename: ONE_HOUR_SECONDS,
     }
@@ -670,7 +670,7 @@ def test_corrupt_duration_is_skipped_not_fatal(tmp_path: Path) -> None:
 
     loads = _load_commands(player)
     assert loads
-    assert loads[0].filename == LITTLE_BEAR_TWO.filename
+    assert loads[0].filename == KIPPER_TWO.filename
 
 
 def test_player_error_skips_to_next_slot_without_exiting(tmp_path: Path) -> None:
@@ -683,7 +683,7 @@ def test_player_error_skips_to_next_slot_without_exiting(tmp_path: Path) -> None
 
     later_slots = [
         slot
-        for slot in _little_bear_timeline(JULY_MORNING.date()).slots
+        for slot in _kipper_timeline(JULY_MORNING.date()).slots
         if slot.start_hour > covering.slot.start_hour
     ]
     loads = _load_commands(player)
@@ -727,7 +727,7 @@ def test_hdmi_retries_then_skips_file(tmp_path: Path) -> None:
 
     later_slots = [
         slot
-        for slot in _little_bear_timeline(JULY_MORNING.date()).slots
+        for slot in _kipper_timeline(JULY_MORNING.date()).slots
         if slot.start_hour > covering.slot.start_hour
     ]
     assert wait.calls == [HDMI_RETRY_WAIT_SECONDS] * HDMI_LOAD_RETRY_COUNT
@@ -741,7 +741,7 @@ def test_duration_lookup_probe_failure_skips(tmp_path: Path) -> None:
         FakeDurationIndex({OSWALD_ONE.filename: ONE_HOUR_SECONDS}),
         FailingProber(),
     )
-    library = FakeLibrarySource(episodes=(LITTLE_BEAR_ONE, OSWALD_ONE, HARRY_ONE))
+    library = FakeLibrarySource(episodes=(KIPPER_ONE, OSWALD_ONE, HARRY_ONE))
     controller, clock, player, _ = _controller(
         tmp_path, library=library, duration_index=lookup
     )
@@ -955,7 +955,7 @@ def test_channel_change_to_empty_friend_holds_slate(tmp_path: Path) -> None:
     assert controller.now_playing() == NOW_PLAYING_SLATE
     assert any(
         isinstance(command, ShowChannelBannerCommand)
-        and command.channel_number == LITTLE_BEAR_CHANNEL_NUMBER
+        and command.channel_number == KIPPER_CHANNEL_NUMBER
         for command in player.commands
     )
 
@@ -988,7 +988,7 @@ def test_stale_channel_four_is_coerced_while_playing(tmp_path: Path) -> None:
 
 
 def test_early_eof_on_last_slot_holds_slate(tmp_path: Path) -> None:
-    last_slot = _little_bear_timeline(JULY_MORNING.date()).slots[-1]
+    last_slot = _kipper_timeline(JULY_MORNING.date()).slots[-1]
     last_start = datetime(
         2024,
         7,
@@ -1009,13 +1009,13 @@ def test_early_eof_on_last_slot_holds_slate(tmp_path: Path) -> None:
 
 
 def _ch01_catalog() -> FakeInterstitialCatalog:
-    return FakeInterstitialCatalog({LITTLE_BEAR_CHANNEL_NUMBER: CH01_BUMPERS})
+    return FakeInterstitialCatalog({KIPPER_CHANNEL_NUMBER: CH01_BUMPERS})
 
 
 def _cartoon_catalog() -> FakeInterstitialCatalog:
     return FakeInterstitialCatalog(
         {
-            LITTLE_BEAR_CHANNEL_NUMBER: CH01_PACK,
+            KIPPER_CHANNEL_NUMBER: CH01_PACK,
             OSWALD_CHANNEL_NUMBER: CH02_PACK,
             HARRY_CHANNEL_NUMBER: CH03_PACK,
         }
@@ -1030,7 +1030,7 @@ def _expected_bumper(
         CH01_BUMPERS,
         seed=interstitial_pick_seed(
             moment.date(),
-            LITTLE_BEAR_CHANNEL_NUMBER,
+            KIPPER_CHANNEL_NUMBER,
             decimal_clock_hour(moment),
         ),
         recently_played=recently_played,
@@ -1045,7 +1045,7 @@ def test_episode_eof_with_catalog_plays_interstitial_not_fade(tmp_path: Path) ->
         tmp_path, clock=clock, interstitial_catalog=_ch01_catalog()
     )
     _wake(controller)
-    first_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[0]
+    first_slot = _kipper_timeline(JULY_SIGN_ON.date()).slots[0]
     assert _load_commands(player)[-1].filename == first_slot.episode.filename
 
     player.mark_playback_ended()
@@ -1056,7 +1056,7 @@ def test_episode_eof_with_catalog_plays_interstitial_not_fade(tmp_path: Path) ->
     assert bumpers[-1].offset_seconds == INTERSTITIAL_START_OFFSET_SECONDS
     assert _fade_commands(player) == ()
     assert controller.now_playing() == (
-        f"{format_channel_banner(LITTLE_BEAR_CHANNEL_NUMBER)} {bumpers[-1].filename}"
+        f"{format_channel_banner(KIPPER_CHANNEL_NUMBER)} {bumpers[-1].filename}"
     )
 
 
@@ -1066,8 +1066,8 @@ def test_interstitial_eof_fades_to_next_episode(tmp_path: Path) -> None:
         tmp_path, clock=clock, interstitial_catalog=_ch01_catalog()
     )
     _wake(controller)
-    first_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[0]
-    second_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[1]
+    first_slot = _kipper_timeline(JULY_SIGN_ON.date()).slots[0]
+    second_slot = _kipper_timeline(JULY_SIGN_ON.date()).slots[1]
     player.mark_playback_ended()
     controller.tick()
     assert _interstitial_commands(player)
@@ -1112,10 +1112,10 @@ def test_later_hour_can_pick_a_different_bumper(tmp_path: Path) -> None:
     later = JULY_SIGN_ON + timedelta(hours=2)
     assert interstitial_pick_seed(
         JULY_SIGN_ON.date(),
-        LITTLE_BEAR_CHANNEL_NUMBER,
+        KIPPER_CHANNEL_NUMBER,
         decimal_clock_hour(JULY_SIGN_ON),
     ) != interstitial_pick_seed(
-        later.date(), LITTLE_BEAR_CHANNEL_NUMBER, decimal_clock_hour(later)
+        later.date(), KIPPER_CHANNEL_NUMBER, decimal_clock_hour(later)
     )
     clock = FakeClock.trusted(later)
     controller, _, player, _ = _controller(
@@ -1212,7 +1212,7 @@ def test_failed_bumper_load_joins_live_airing(tmp_path: Path) -> None:
         interstitial_catalog=_ch01_catalog(),
     )
     _wake(controller)
-    second_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[1]
+    second_slot = _kipper_timeline(JULY_SIGN_ON.date()).slots[1]
     player.mark_playback_ended()
     clock.advance_time(timedelta(hours=1))
     controller.tick()
@@ -1226,7 +1226,7 @@ def test_empty_catalog_eof_still_fade_joins(tmp_path: Path) -> None:
     clock = FakeClock.trusted(JULY_SIGN_ON)
     controller, _, player, _ = _controller(tmp_path, clock=clock)
     _wake(controller)
-    second_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[1]
+    second_slot = _kipper_timeline(JULY_SIGN_ON.date()).slots[1]
     player.mark_playback_ended()
     clock.advance_time(timedelta(hours=1))
     controller.tick()
@@ -1245,7 +1245,7 @@ def test_catalog_error_joins_live_airing(tmp_path: Path) -> None:
         logger=logger,
     )
     _wake(controller)
-    second_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[1]
+    second_slot = _kipper_timeline(JULY_SIGN_ON.date()).slots[1]
     player.mark_playback_ended()
     clock.advance_time(timedelta(hours=1))
     controller.tick()
@@ -1264,12 +1264,12 @@ def test_episode_eof_plays_bumper_for_the_tuned_cartoon_channel(
     _wake(controller)
     player.mark_playback_ended()
     controller.tick()
-    little = _interstitial_commands(player)[-1].filename
-    assert little in CH01_PACK
-    assert little.startswith("ch01/")
-    assert "little_bear" in little
-    assert "oswald" not in little
-    assert "harry" not in little
+    kipper = _interstitial_commands(player)[-1].filename
+    assert kipper in CH01_PACK
+    assert kipper.startswith("ch01/")
+    assert "kipper" in kipper
+    assert "oswald" not in kipper
+    assert "harry" not in kipper
 
     clock.advance_time(COOLDOWN)
     controller.channel_up()
@@ -1279,7 +1279,7 @@ def test_episode_eof_plays_bumper_for_the_tuned_cartoon_channel(
     assert oswald in CH02_PACK
     assert oswald.startswith("ch02/")
     assert "oswald" in oswald
-    assert "little_bear" not in oswald
+    assert "kipper" not in oswald
     assert "harry" not in oswald
 
     clock.advance_time(COOLDOWN)
@@ -1291,7 +1291,7 @@ def test_episode_eof_plays_bumper_for_the_tuned_cartoon_channel(
     assert harry.startswith("ch03/")
     assert "harry" in harry
     assert "oswald" not in harry
-    assert "little_bear" not in harry
+    assert "kipper" not in harry
 
 
 def test_television_module_does_not_import_metadata_source() -> None:

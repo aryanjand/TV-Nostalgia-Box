@@ -26,7 +26,7 @@ from tv90.application.television import (
 from tv90.config import (
     COMMAND_COOLDOWN_MILLISECONDS,
     HARRY_CHANNEL_NUMBER,
-    LITTLE_BEAR_CHANNEL_NUMBER,
+    KIPPER_CHANNEL_NUMBER,
     OSWALD_CHANNEL_NUMBER,
     VOLUME_DEFAULT,
     load_settings,
@@ -42,11 +42,11 @@ JULY_MORNING = datetime(2024, 7, 15, 7, 0, tzinfo=VANCOUVER)
 COOLDOWN = timedelta(milliseconds=COMMAND_COOLDOWN_MILLISECONDS)
 ONE_HOUR_SECONDS = float(SECONDS_PER_HOUR)
 
-LITTLE_BEAR_ONE = parse_filename("LittleBear_S01E01.mp4")
-LITTLE_BEAR_TWO = parse_filename("LittleBear_S01E02.mp4")
+KIPPER_ONE = parse_filename("Kipper_S01E01.mp4")
+KIPPER_TWO = parse_filename("Kipper_S01E02.mp4")
 OSWALD_ONE = parse_filename("Oswald_S01E01.mp4")
 HARRY_ONE = parse_filename("Harry_S01E01.mp4")
-DAYTIME_LIBRARY = (LITTLE_BEAR_ONE, LITTLE_BEAR_TWO, OSWALD_ONE, HARRY_ONE)
+DAYTIME_LIBRARY = (KIPPER_ONE, KIPPER_TWO, OSWALD_ONE, HARRY_ONE)
 HOUR_DURATIONS = {episode.filename: ONE_HOUR_SECONDS for episode in DAYTIME_LIBRARY}
 
 REMOTE_BUTTONS = (
@@ -146,13 +146,11 @@ def test_home_page_has_four_buttons_and_now_playing(tmp_path: Path) -> None:
         assert label in html
     assert "Now Playing" in html
     assert controller.now_playing() in html
-    assert format_channel_banner(LITTLE_BEAR_CHANNEL_NUMBER) in html
+    assert format_channel_banner(KIPPER_CHANNEL_NUMBER) in html
     assert 'class="channel-bug"' in html
     assert "Volume" in html
     assert 'class="volume-track"' in html
-    assert any(
-        episode.filename in html for episode in (LITTLE_BEAR_ONE, LITTLE_BEAR_TWO)
-    )
+    assert any(episode.filename in html for episode in (KIPPER_ONE, KIPPER_TWO))
 
 
 def test_home_page_shows_clock_not_synced_while_waiting(tmp_path: Path) -> None:
@@ -210,9 +208,7 @@ def test_status_get_returns_json_shape(tmp_path: Path) -> None:
     assert isinstance(payload, dict)
     assert set(payload) == {"now_playing", "channel_banner", "volume_segments"}
     assert payload["now_playing"] == controller.now_playing()
-    assert payload["channel_banner"] == format_channel_banner(
-        LITTLE_BEAR_CHANNEL_NUMBER
-    )
+    assert payload["channel_banner"] == format_channel_banner(KIPPER_CHANNEL_NUMBER)
     assert payload["volume_segments"] == list(controller.volume_segments())
     assert len(payload["volume_segments"]) == VOLUME_BAR_SEGMENT_COUNT
 

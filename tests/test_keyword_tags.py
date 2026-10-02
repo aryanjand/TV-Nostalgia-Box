@@ -40,7 +40,7 @@ def test_moon_matches_night() -> None:
 
 
 def test_breakfast_matches_morning() -> None:
-    matches = match_keywords("Breakfast with Little Bear", "", STARTING_RULES)
+    matches = match_keywords("Breakfast with Kipper", "", STARTING_RULES)
 
     assert [(match.tag, match.keywords) for match in matches] == [
         ("MORNING", ("breakfast",))
@@ -101,7 +101,7 @@ def test_packaged_rules_cover_starting_examples_and_extra_seasons() -> None:
 
 
 def test_existing_morning_is_kept_when_night_keywords_match() -> None:
-    episode = parse_filename("LittleBear_S01E01_MORNING.mp4")
+    episode = parse_filename("Kipper_S01E01_MORNING.mp4")
     matches = match_keywords("Moon", "bedtime sleep stars", STARTING_RULES)
 
     proposal = propose_tagged_episode(episode, matches)
@@ -109,17 +109,17 @@ def test_existing_morning_is_kept_when_night_keywords_match() -> None:
     assert proposal.episode.daypart is Daypart.MORNING
     assert proposal.episode.season_tag is SeasonTag.EVERGREEN
     assert all(match.tag != "NIGHT" for match in proposal.applied_matches)
-    assert proposal.episode.filename == "LittleBear_S01E01_MORNING.mp4"
+    assert proposal.episode.filename == "Kipper_S01E01_MORNING.mp4"
 
 
 def test_new_tags_are_added_when_absent() -> None:
-    episode = parse_filename("LittleBear_S01E01.mp4")
+    episode = parse_filename("Kipper_S01E01.mp4")
     matches = match_keywords("Snow", "ice on the sled", STARTING_RULES)
 
     proposal = propose_tagged_episode(episode, matches)
 
     assert proposal.episode.season_tag is SeasonTag.WINTER
-    assert proposal.episode.filename == "LittleBear_S01E01_WINTER.mp4"
+    assert proposal.episode.filename == "Kipper_S01E01_WINTER.mp4"
     assert proposal.applied_matches[0].tag == "WINTER"
 
 
@@ -138,13 +138,13 @@ def test_first_same_kind_rule_wins_when_both_dayparts_match() -> None:
 
 
 def test_holiday_tag_is_added_from_keywords() -> None:
-    episode = parse_filename("LittleBear_S01E04.mp4")
+    episode = parse_filename("Kipper_S01E04.mp4")
     matches = match_keywords("Pumpkin", "", STARTING_RULES)
 
     proposal = propose_tagged_episode(episode, matches)
 
     assert proposal.episode.holiday_tag is HolidayTag.HALLOWEEN
-    assert proposal.episode.filename == "LittleBear_S01E04_HALLOWEEN.mp4"
+    assert proposal.episode.filename == "Kipper_S01E04_HALLOWEEN.mp4"
 
 
 def test_parse_keyword_rules_rejects_unknown_tag() -> None:
@@ -251,7 +251,7 @@ def test_parse_keyword_rules_deduplicates_keywords() -> None:
 
 
 def test_existing_season_is_kept_when_other_season_keywords_match() -> None:
-    episode = parse_filename("LittleBear_S01E01_SUMMER.mp4")
+    episode = parse_filename("Kipper_S01E01_SUMMER.mp4")
     matches = match_keywords("snow sled ice", "", STARTING_RULES)
 
     proposal = propose_tagged_episode(episode, matches)
@@ -261,7 +261,7 @@ def test_existing_season_is_kept_when_other_season_keywords_match() -> None:
 
 
 def test_existing_holiday_is_kept_when_other_holiday_keywords_match() -> None:
-    episode = parse_filename("LittleBear_S01E01_EASTER.mp4")
+    episode = parse_filename("Kipper_S01E01_EASTER.mp4")
     matches = match_keywords("pumpkin costume", "", STARTING_RULES)
 
     proposal = propose_tagged_episode(episode, matches)
@@ -271,7 +271,7 @@ def test_existing_holiday_is_kept_when_other_holiday_keywords_match() -> None:
 
 
 def test_unknown_match_tag_is_rejected() -> None:
-    episode = parse_filename("LittleBear_S01E01.mp4")
+    episode = parse_filename("Kipper_S01E01.mp4")
     matches = (KeywordMatch(tag="SPICY", keywords=("hot",)),)
 
     with pytest.raises(InvalidKeywordRulesError, match="unknown keyword tag"):

@@ -2,7 +2,7 @@ from datetime import date
 
 from tv90.config import (
     HOLIDAY_CHANNEL_NUMBER,
-    LITTLE_BEAR_CHANNEL_NUMBER,
+    KIPPER_CHANNEL_NUMBER,
     OSWALD_CHANNEL_NUMBER,
     load_settings,
 )
@@ -22,17 +22,17 @@ CHRISTMAS_DAY = date(2024, 12, 25)
 EIGHT_IN_THE_MORNING = 8.0
 MIDDAY_HOUR = 13.0
 
-SUMMER_MORNING = parse_filename("LittleBear_S01E04_MORNING_SUMMER.mp4")
-WINTER_NIGHT_CHRISTMAS = parse_filename("LittleBear_S01E08_NIGHT_WINTER_CHRISTMAS.mp4")
-GENERAL_EVERGREEN = parse_filename("LittleBear_S01E01.mp4")
-GENERAL_DAY_TAG = parse_filename("LittleBear_S01E02_DAY.mp4")
+SUMMER_MORNING = parse_filename("Kipper_S01E04_MORNING_SUMMER.mp4")
+WINTER_NIGHT_CHRISTMAS = parse_filename("Kipper_S01E08_NIGHT_WINTER_CHRISTMAS.mp4")
+GENERAL_EVERGREEN = parse_filename("Kipper_S01E01.mp4")
+GENERAL_DAY_TAG = parse_filename("Kipper_S01E02_DAY.mp4")
 HOLIDAY_GENERAL_MOVIE = parse_filename("Holiday_Rudolph_CHRISTMAS.mp4")
 HOLIDAY_DAY_TAG_MOVIE = parse_filename("Holiday_Frosty_DAY_CHRISTMAS.mp4")
 HOLIDAY_MORNING_MOVIE = parse_filename("Holiday_Rudolph_MORNING_CHRISTMAS.mp4")
 HOLIDAY_NIGHT_MOVIE = parse_filename("Holiday_Rudolph_NIGHT_CHRISTMAS.mp4")
 
 
-def _combined(channel_number: int = LITTLE_BEAR_CHANNEL_NUMBER) -> CombinedWeight:
+def _combined(channel_number: int = KIPPER_CHANNEL_NUMBER) -> CombinedWeight:
     settings = load_settings({})
     return CombinedWeight(
         settings,
@@ -64,13 +64,13 @@ def _expected_product(
 
 
 def test_combined_weight_is_the_product_of_the_four_factors() -> None:
-    recently_aired = ("LittleBear_S01E99.mp4",)
+    recently_aired = ("Kipper_S01E99.mp4",)
     expected = _expected_product(
         SUMMER_MORNING,
         EIGHT_IN_THE_MORNING,
         JULY_FIFTEENTH,
         recently_aired,
-        LITTLE_BEAR_CHANNEL_NUMBER,
+        KIPPER_CHANNEL_NUMBER,
     )
 
     actual = _combined().weight(
@@ -105,7 +105,7 @@ def test_combined_weight_multiplies_off_peak_wrong_season_and_holiday_downweight
         EIGHT_IN_THE_MORNING,
         JULY_FIFTEENTH,
         (),
-        LITTLE_BEAR_CHANNEL_NUMBER,
+        KIPPER_CHANNEL_NUMBER,
     )
 
     actual = _combined().weight(
@@ -137,8 +137,8 @@ def test_combined_weight_multiplies_off_peak_wrong_season_and_holiday_downweight
 
 def test_blocked_recency_makes_the_product_zero() -> None:
     history = (
-        "LittleBear_S01E09.mp4",
-        "LittleBear_S01E10.mp4",
+        "Kipper_S01E09.mp4",
+        "Kipper_S01E10.mp4",
         GENERAL_EVERGREEN.filename,
     )
     settings = load_settings({})
@@ -277,7 +277,7 @@ def test_cartoon_channel_general_file_at_eight_stays_off_peak() -> None:
         GENERAL_EVERGREEN, EIGHT_IN_THE_MORNING
     )
 
-    actual = _combined(LITTLE_BEAR_CHANNEL_NUMBER).weight(
+    actual = _combined(KIPPER_CHANNEL_NUMBER).weight(
         GENERAL_EVERGREEN,
         EIGHT_IN_THE_MORNING,
         JULY_FIFTEENTH,
@@ -290,7 +290,7 @@ def test_cartoon_channel_general_file_at_eight_stays_off_peak() -> None:
         EIGHT_IN_THE_MORNING,
         JULY_FIFTEENTH,
         (),
-        LITTLE_BEAR_CHANNEL_NUMBER,
+        KIPPER_CHANNEL_NUMBER,
     )
     assert actual != _combined(HOLIDAY_CHANNEL_NUMBER).weight(
         GENERAL_EVERGREEN,

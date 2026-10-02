@@ -41,9 +41,9 @@ from tv90.config import (
     HARRY_SHOW_STEM,
     HOLIDAY_CHANNEL_NUMBER,
     HOLIDAY_SHOW_STEM,
+    KIPPER_CHANNEL_NUMBER,
+    KIPPER_SHOW_STEM,
     LAYER_A_EVENT_MULTIPLIER,
-    LITTLE_BEAR_CHANNEL_NUMBER,
-    LITTLE_BEAR_SHOW_STEM,
     OSWALD_CHANNEL_NUMBER,
     OSWALD_SHOW_STEM,
     WRONG_SEASON_WEIGHT,
@@ -67,7 +67,7 @@ SHORT_CLOCK_TRUST_TIMEOUT_SECONDS = "5"
 SHORT_CLOCK_TRUST_TIMEOUT = timedelta(seconds=5)
 
 SHOW_STEM_BY_CHANNEL = {
-    LITTLE_BEAR_CHANNEL_NUMBER: LITTLE_BEAR_SHOW_STEM,
+    KIPPER_CHANNEL_NUMBER: KIPPER_SHOW_STEM,
     OSWALD_CHANNEL_NUMBER: OSWALD_SHOW_STEM,
     HARRY_CHANNEL_NUMBER: HARRY_SHOW_STEM,
     HOLIDAY_CHANNEL_NUMBER: HOLIDAY_SHOW_STEM,
@@ -310,7 +310,7 @@ def _surf_wrap(
         channel_number, episode = _require_playing(controller)
         _assert_show_isolation(channel_number, episode)
         visited.append(channel_number)
-        if len(visited) > 1 and channel_number == LITTLE_BEAR_CHANNEL_NUMBER:
+        if len(visited) > 1 and channel_number == KIPPER_CHANNEL_NUMBER:
             break
     return tuple(visited)
 
@@ -324,12 +324,12 @@ def _page_text(client: FlaskClient) -> str:
 def test_e2e_library_copy_skips_leftover_metadata_cache(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
-    (source / "LittleBear_S01E01.mp4").write_bytes(b"")
+    (source / "Kipper_S01E01.mp4").write_bytes(b"")
     (source / METADATA_CACHE_FILENAME).write_text("{}\n", encoding="utf-8")
 
     dest = _copy_library(source, tmp_path / "library")
 
-    assert (dest / "LittleBear_S01E01.mp4").is_file()
+    assert (dest / "Kipper_S01E01.mp4").is_file()
     assert not (dest / METADATA_CACHE_FILENAME).exists()
 
 
@@ -365,7 +365,7 @@ def test_july_week_cartoon_channels_dayparts_and_show_isolation(
         ):
             _join_live(controller, clock, player, _at(on_date, hour, minute))
             channel_number, episode = _require_playing(controller)
-            assert channel_number == LITTLE_BEAR_CHANNEL_NUMBER
+            assert channel_number == KIPPER_CHANNEL_NUMBER
             _assert_show_isolation(channel_number, episode)
             assert HOLIDAY_SHOW_STEM not in episode.filename
             bucket.append(episode.daypart)
@@ -373,10 +373,10 @@ def test_july_week_cartoon_channels_dayparts_and_show_isolation(
         wrap = _surf_wrap(controller, clock)
         assert HOLIDAY_CHANNEL_NUMBER not in wrap
         assert wrap == (
-            LITTLE_BEAR_CHANNEL_NUMBER,
+            KIPPER_CHANNEL_NUMBER,
             OSWALD_CHANNEL_NUMBER,
             HARRY_CHANNEL_NUMBER,
-            LITTLE_BEAR_CHANNEL_NUMBER,
+            KIPPER_CHANNEL_NUMBER,
         )
         clock.advance_time(COOLDOWN)
         controller.channel_down()
@@ -385,7 +385,7 @@ def test_july_week_cartoon_channels_dayparts_and_show_isolation(
         _assert_show_isolation(down_channel, down_episode)
         clock.advance_time(COOLDOWN)
         controller.channel_up()
-        assert _require_playing(controller)[0] == LITTLE_BEAR_CHANNEL_NUMBER
+        assert _require_playing(controller)[0] == KIPPER_CHANNEL_NUMBER
 
     assert morning_dayparts.count(Daypart.MORNING) > morning_dayparts.count(
         Daypart.NIGHT
@@ -414,7 +414,7 @@ def test_halloween_opens_channel_four_with_layer_a_and_holiday_movies(
     controller, clock, player, _power, calendar = _controller(tmp_path, clock=clock)
     _wake(controller)
 
-    halloween_cartoon = parse_filename("LittleBear_S01E09_HALLOWEEN.mp4")
+    halloween_cartoon = parse_filename("Kipper_S01E09_HALLOWEEN.mp4")
     assert calendar.channel_four_open(HALLOWEEN) is True
     assert calendar.active_holiday(HALLOWEEN) is HolidayTag.HALLOWEEN
     assert calendar.layer_a_multiplier(halloween_cartoon, HALLOWEEN) == pytest.approx(
@@ -426,11 +426,11 @@ def test_halloween_opens_channel_four_with_layer_a_and_holiday_movies(
 
     wrap = _surf_wrap(controller, clock)
     assert wrap == (
-        LITTLE_BEAR_CHANNEL_NUMBER,
+        KIPPER_CHANNEL_NUMBER,
         OSWALD_CHANNEL_NUMBER,
         HARRY_CHANNEL_NUMBER,
         HOLIDAY_CHANNEL_NUMBER,
-        LITTLE_BEAR_CHANNEL_NUMBER,
+        KIPPER_CHANNEL_NUMBER,
     )
 
     clock.advance_time(COOLDOWN)
@@ -452,9 +452,9 @@ def test_halloween_opens_channel_four_with_layer_a_and_holiday_movies(
     clock.advance_time(COOLDOWN)
     controller.channel_up()
     channel_number, episode = _require_playing(controller)
-    assert channel_number == LITTLE_BEAR_CHANNEL_NUMBER
+    assert channel_number == KIPPER_CHANNEL_NUMBER
     _assert_show_isolation(channel_number, episode)
-    assert episode.show_stem == LITTLE_BEAR_SHOW_STEM
+    assert episode.show_stem == KIPPER_SHOW_STEM
 
 
 def test_day_after_halloween_drops_channel_four_and_coerces_stale(
@@ -474,15 +474,15 @@ def test_day_after_halloween_drops_channel_four_and_coerces_stale(
 
     assert calendar.channel_four_open(DAY_AFTER_HALLOWEEN) is False
     channel_number, episode = _require_playing(controller)
-    assert channel_number == LITTLE_BEAR_CHANNEL_NUMBER
+    assert channel_number == KIPPER_CHANNEL_NUMBER
     _assert_show_isolation(channel_number, episode)
     wrap_after = _surf_wrap(controller, clock)
     assert HOLIDAY_CHANNEL_NUMBER not in wrap_after
     assert wrap_after == (
-        LITTLE_BEAR_CHANNEL_NUMBER,
+        KIPPER_CHANNEL_NUMBER,
         OSWALD_CHANNEL_NUMBER,
         HARRY_CHANNEL_NUMBER,
-        LITTLE_BEAR_CHANNEL_NUMBER,
+        KIPPER_CHANNEL_NUMBER,
     )
 
 
@@ -492,7 +492,7 @@ def test_night_lock_off_air_survives_midnight_then_morning_idle_until_wake(
     clock = FakeClock.trusted(_at(JULY_WEEK_START, 20, 50))
     controller, clock, player, power, _calendar = _controller(tmp_path, clock=clock)
     _wake(controller)
-    assert _require_playing(controller)[0] == LITTLE_BEAR_CHANNEL_NUMBER
+    assert _require_playing(controller)[0] == KIPPER_CHANNEL_NUMBER
 
     _advance_to(clock, _at(JULY_WEEK_START, 21, 0))
     controller.tick()
@@ -526,7 +526,7 @@ def test_night_lock_off_air_survives_midnight_then_morning_idle_until_wake(
 
     assert power.commands == ()
     channel_number, episode = _require_playing(controller)
-    assert channel_number == LITTLE_BEAR_CHANNEL_NUMBER
+    assert channel_number == KIPPER_CHANNEL_NUMBER
     _assert_show_isolation(channel_number, episode)
     loads = tuple(
         command for command in player.commands if isinstance(command, LoadCommand)
@@ -594,10 +594,10 @@ def test_yanked_file_fail_soft_controller_keeps_ticking(tmp_path: Path) -> None:
     )
     _wake(controller)
     _channel, playing = _require_playing(controller)
-    assert playing.show_stem == LITTLE_BEAR_SHOW_STEM
+    assert playing.show_stem == KIPPER_SHOW_STEM
 
     for episode in _sample_episodes():
-        if episode.show_stem == LITTLE_BEAR_SHOW_STEM:
+        if episode.show_stem == KIPPER_SHOW_STEM:
             player.yank(episode.filename)
 
     player.mark_playback_ended()

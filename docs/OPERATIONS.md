@@ -8,7 +8,7 @@ This is a small television, not YouTube.
 
 Plug it in and the box sits on a calm slate. The parent turns the TV on themselves. There is no menu, no search, no “Up Next,” and no list of episodes to pick. A parent phone on the home Wi-Fi can change channel and volume. That is all.
 
-Three friends live on three channels: Little Bear on CH 01, Oswald on CH 02, Harry and His Bucket Full of Dinosaurs on CH 03. A fourth channel appears only around a holiday, with a small set of holiday movies. Shows never come from the internet. If the Wi-Fi is down, the picture still plays from the files on the box.
+Three friends live on three channels: Kipper on CH 01, Oswald on CH 02, Harry and His Bucket Full of Dinosaurs on CH 03. A fourth channel appears only around a holiday, with a small set of holiday movies. Shows never come from the internet. If the Wi-Fi is down, the picture still plays from the files on the box.
 
 Mornings tend to be morning-tagged episodes, evenings night-tagged, midday ordinary ones. After 9:00 PM the box goes off-air (calm slate) until morning sign-on (6:30 AM unless you change it). The TV itself is not put on standby; you turn the set on and off. Pulling the power plug is how you turn the box off. That is on purpose.
 
@@ -21,7 +21,7 @@ You need a Raspberry Pi 4, a microSD card, an HDMI cable to the TV, and the offi
 3. On the Pi, open a terminal in the project folder and run `sudo ./setup.sh`. Wait until it finishes. The hostname becomes `90stv`. Folders, the TV service, and the maintenance command are installed. The same command also downloads the three shows (and holiday specials) into `/srv/90stv/library` and generates channel bumpers under `/srv/90stv/interstitials/ch01` through `ch04` — bumpers never go in the episode folder. Downloads take a long time and need the network. If you only want packages and folders, run `sudo ./setup.sh --skip-media`. On a laptop with no sudo, `./setup.sh` installs a local `.venv` and puts files in `downloads/library` and `downloads/interstitials`.
 4. If the script says a reboot is needed for the write-protect overlay, reboot now. After it comes back, `sudo tv90-maintenance status` prints the current mode.
 5. Tagging is optional and is not applied automatically. If you want tags, enter maintenance with `sudo tv90-maintenance on` (next section). The words **maintenance mode** print *before* any reboot. After the Pi comes back it will not reprint the mode. Run `sudo tv90-maintenance status` and confirm it says `maintenance mode`. Setup already ran `tv90 index` when episodes were present; if you skip tagging you can play after the overlay reboot.
-6. In maintenance, dry-run tag then `--apply`, then index again (see “Adding episodes” below). Those commands need `sudo` (or the `tv90` user). Extra files you copy by hand still go in that one library folder: `LittleBear_S01E04.mp4`, `Holiday_Rudolph_CHRISTMAS.mp4`.
+6. In maintenance, dry-run tag then `--apply`, then index again (see “Adding episodes” below). Those commands need `sudo` (or the `tv90` user). Extra files you copy by hand still go in that one library folder: `Kipper_S01E04.mp4`, `Holiday_Rudolph_CHRISTMAS.mp4`.
 7. Leave maintenance with `sudo tv90-maintenance off`. **tv mode** prints before any reboot; after the Pi comes back it will not reprint the mode. The television should be on: no desktop, the stream on the set. Confirm with `sudo tv90-maintenance status` if you want the printed words.
 
 If the library is still empty, the child should see a calm colored slate, never a desktop or an error dump. Re-running `sudo ./setup.sh` is safe: it skips files that are already the right size, keeps a household-edited `90stv.service`, and only installs missing packages. Use `--repair` to fill missing or corrupt bumpers.
@@ -57,7 +57,7 @@ Wrong usage prints: `usage: tv90-maintenance on|off|status`
 
 Always in maintenance mode. The library folder is owned by the `tv90` user. Copy, tag, and index with `sudo` (or as `tv90`) so you do not get permission errors.
 
-1. Copy the new video files into `/srv/90stv/library` (`sudo cp … /srv/90stv/library/`). One flat folder. Use the show names the box already knows: `LittleBear_`, `Oswald_`, `Harry_`, or `Holiday_`. Cartoons need a season and episode number (`S01E04`). Holiday movies need a title and a holiday word (`_HALLOWEEN`, `_THANKSGIVING`, `_CHRISTMAS`, or `_EASTER`).
+1. Copy the new video files into `/srv/90stv/library` (`sudo cp … /srv/90stv/library/`). One flat folder. Use the show names the box already knows: `Kipper_`, `Oswald_`, `Harry_`, or `Holiday_`. Cartoons need a season and episode number (`S01E04`). Holiday movies need a title and a holiday word (`_HALLOWEEN`, `_THANKSGIVING`, `_CHRISTMAS`, or `_EASTER`).
 2. Dry-run tags (changes nothing). On the Pi:
 
    `sudo /opt/90stv/venv/bin/python3 -m tv90 tag --library /srv/90stv/library`

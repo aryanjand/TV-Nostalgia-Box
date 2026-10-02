@@ -4,7 +4,7 @@
 
 Unlike YouTube or Netflix, this box is not engineered for watch time, click-through, or a dopamine loop. It is a **safe, passive routine** for a 2-year-old: cognitive calm, developmental consistency, and stress-free entertainment. Script and library architecture must prioritize the following over engagement metrics.
 
-1. **Minimal cognitive stimulation (slow pacing).** Fast-cut, high-energy feeds (Cocomelon-style flashes, unboxings) hyper-focus attention and leave kids irritable. The library is *Little Bear*, *Oswald*, and *Harry and His Bucket Full of Dinosaurs* — slow camera, visual stillness, quiet music. Do not add high-stimulation titles to “fill the card.”
+1. **Minimal cognitive stimulation (slow pacing).** Fast-cut, high-energy feeds (Cocomelon-style flashes, unboxings) hyper-focus attention and leave kids irritable. The library is *Kipper*, *Oswald*, and *Harry and His Bucket Full of Dinosaurs* — slow camera, visual stillness, quiet music. Do not add high-stimulation titles to “fill the card.”
 2. **Predictability and routine over novelty.** A changing feed keeps kids searching. A **closed ~140-episode library** of the same three friends, looping familiar simple tasks, is how toddlers learn language and structure. Comfort, not “what’s new.”
 3. **Gentle environmental connection.** Algorithms detach kids from the room and the season. Filename tags (`_WINTER`, `_SUMMER`, `_MORNING`, `_NIGHT`, holiday suffixes) plus the Python scheduler keep the screen an extension of the real day: weather, trees, morning vs bedtime, holidays outside the window.
 4. **Zero decision fatigue (no menus).** Scrolling pickers create fights. There is no episode list, no search, no Up Next. Power on plays a gentle surprise; power off is the only “choice.” Channel buttons (if used) only switch which of the three friends is on — never which file.
@@ -58,13 +58,13 @@ The box is switched off like a TV: the plug is pulled, with no shutdown sequence
 
 ### 4. Content Scheduling & Time-Aware Engine
 
-The scheduler is how the north star becomes code: **which episode of the current friend** is on, given clock, season, and holiday — never which new video to chase. CH 01–03 stay one show each. Time-of-day Gaussians bias *morning-tagged episodes to the morning* and *night-tagged episodes to the evening* inside that show. They do not mix Little Bear against Oswald (that would be a feed).
+The scheduler is how the north star becomes code: **which episode of the current friend** is on, given clock, season, and holiday — never which new video to chase. CH 01–03 stay one show each. Time-of-day Gaussians bias *morning-tagged episodes to the morning* and *night-tagged episodes to the evening* inside that show. They do not mix Kipper against Oswald (that would be a feed).
 
 * **Closed 3-Show Library (~140 episodes):** Three dedicated cartoon channels, one show each, on the 32GB card. No search, no related videos, no growing catalog.
 
   | Channel | Show | Role on the box |
   | --- | --- | --- |
-  | **CH 01** | *Little Bear* | Slow pans, quiet woods, low sensory load |
+  | **CH 01** | *Kipper* | Gentle walks, quiet friends, low sensory load |
   | **CH 02** | *Oswald* | Gentle city strolls, classical-leaning music |
   | **CH 03** | *Harry and His Bucket Full of Dinosaurs* | Familiar friend + simple pretend-play loop |
   | **CH 04** | Holiday movies | **Ghost channel** — not in the lineup except during a holiday window |
@@ -73,11 +73,11 @@ The scheduler is how the north star becomes code: **which episode of the current
 
 * **Filename Tags, Flat Library:** Single folder. The scheduler parses suffixes:
 
-  * Show stem: `LittleBear_…`, `Oswald_…`, `Harry_…`, `Holiday_…`.
+  * Show stem: `Kipper_…`, `Oswald_…`, `Harry_…`, `Holiday_…`.
   * Daypart: `_MORNING`, `_NIGHT` (omit = **general** — equal chance at midday). Optional `_DAY` is treated the same as untagged.
   * Season: `_SPRING`, `_SUMMER`, `_AUTUMN`, `_WINTER` (omit = season-evergreen).
   * Holiday: `_HALLOWEEN`, `_THANKSGIVING`, `_CHRISTMAS`, `_EASTER`.
-  * Example: `LittleBear_S01E04_MORNING_WINTER.mp4`, `Oswald_S01E09_NIGHT.mp4`, `Holiday_Rudolph_CHRISTMAS.mp4`.
+  * Example: `Kipper_S01E04_MORNING_WINTER.mp4`, `Oswald_S01E09_NIGHT.mp4`, `Holiday_Rudolph_CHRISTMAS.mp4`.
   * Tags are assigned by `python -m tv90 tag` (see §6), not by hand.
 
 * **Per-Channel Daily Timeline (live TV, time-varying weights):** Because each cartoon channel **is** one show, the engine never picks a series. At local midnight (or first boot), it **walks the broadcast day in order** and fills slots so 8:00 AM draws morning-biased, midday is a **fair lottery among general episodes**, and evening draws night-biased until the 9:00 PM lock:
@@ -102,7 +102,7 @@ The scheduler is how the north star becomes code: **which episode of the current
 
 * **Night lock — 9:00 PM:** Hard stop at **21:00 local**. The engine will not start a new episode at or after 9:00 PM. The box holds an off-air slate; it does not send HDMI-CEC standby. This is the only hard time gate; morning/night Gaussians stay probabilistic.
 
-* **4-Season Ambient Sync (within each show):** Month → meteorological season (Spring Mar–May, Summer Jun–Aug, Autumn Sep–Nov, Winter Dec–Feb). Current-season tags get ~80% of seasonal weight; season-evergreen fills the rest; wrong-season is down-weighted (snowy Little Bear is rare in July), not deleted. Screen weather should mostly match the trees outside.
+* **4-Season Ambient Sync (within each show):** Month → meteorological season (Spring Mar–May, Summer Jun–Aug, Autumn Sep–Nov, Winter Dec–Feb). Current-season tags get ~80% of seasonal weight; season-evergreen fills the rest; wrong-season is down-weighted (snowy Kipper is rare in July), not deleted. Screen weather should mostly match the trees outside.
 
 * **Holiday Engine — two layers:**
 

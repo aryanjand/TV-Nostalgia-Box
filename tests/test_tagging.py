@@ -26,46 +26,46 @@ class ForbiddenMetadataSource:
 
 
 def test_dry_run_renames_nothing(tmp_path: Path) -> None:
-    path = tmp_path / "LittleBear_S01E01.mp4"
+    path = tmp_path / "Kipper_S01E01.mp4"
     path.write_bytes(b"video")
     episode = parse_filename(path.name)
     source = FakeEpisodeMetadataSource(
-        {("LittleBear", 1, 1): EpisodeMetadata("Snow Day", "ice on the sled")}
+        {("Kipper", 1, 1): EpisodeMetadata("Snow Day", "ice on the sled")}
     )
 
     preview = preview_tags((episode,), source, RULES)
 
     assert path.exists()
     assert path.read_bytes() == b"video"
-    assert preview.rows[0].proposed_filename == "LittleBear_S01E01_WINTER.mp4"
+    assert preview.rows[0].proposed_filename == "Kipper_S01E01_WINTER.mp4"
     assert preview.rows[0].proposed_tags == ("WINTER",)
     assert "WINTER: snow" not in preview.rows[0].filename
     assert preview.not_found_filenames == ()
 
 
 def test_apply_renames_to_canonical_tagged_filename(tmp_path: Path) -> None:
-    path = tmp_path / "LittleBear_S01E01.mp4"
+    path = tmp_path / "Kipper_S01E01.mp4"
     path.write_bytes(b"video")
     episode = parse_filename(path.name)
     source = FakeEpisodeMetadataSource(
-        {("LittleBear", 1, 1): EpisodeMetadata("Snow Day", "ice on the sled")}
+        {("Kipper", 1, 1): EpisodeMetadata("Snow Day", "ice on the sled")}
     )
 
     preview = apply_tags(tmp_path, (episode,), source, RULES)
 
     assert not path.exists()
-    renamed = tmp_path / "LittleBear_S01E01_WINTER.mp4"
+    renamed = tmp_path / "Kipper_S01E01_WINTER.mp4"
     assert renamed.exists()
     assert renamed.read_bytes() == b"video"
     assert preview.rows[0].proposed_filename == renamed.name
 
 
 def test_existing_tags_are_preserved_when_night_keywords_match(tmp_path: Path) -> None:
-    path = tmp_path / "LittleBear_S01E01_MORNING.mp4"
+    path = tmp_path / "Kipper_S01E01_MORNING.mp4"
     path.write_bytes(b"")
     episode = parse_filename(path.name)
     source = FakeEpisodeMetadataSource(
-        {("LittleBear", 1, 1): EpisodeMetadata("Moon Sleep", "bedtime among the stars")}
+        {("Kipper", 1, 1): EpisodeMetadata("Moon Sleep", "bedtime among the stars")}
     )
 
     preview = preview_tags((episode,), source, RULES)
@@ -75,7 +75,7 @@ def test_existing_tags_are_preserved_when_night_keywords_match(tmp_path: Path) -
     assert all(match.tag != "NIGHT" for match in preview.rows[0].triggers)
     assert path.exists()
     assert apply_preview.skipped_filenames == ()
-    assert (tmp_path / "LittleBear_S01E01_MORNING.mp4").exists()
+    assert (tmp_path / "Kipper_S01E01_MORNING.mp4").exists()
 
 
 def test_unmatched_episode_stays_untagged(tmp_path: Path) -> None:
@@ -98,11 +98,11 @@ def test_unmatched_episode_stays_untagged(tmp_path: Path) -> None:
 
 def test_not_found_is_listed_and_not_renamed(tmp_path: Path) -> None:
     missing = tmp_path / "Harry_S01E01.mp4"
-    found = tmp_path / "LittleBear_S01E01.mp4"
+    found = tmp_path / "Kipper_S01E01.mp4"
     missing.write_bytes(b"harry")
     found.write_bytes(b"bear")
     source = FakeEpisodeMetadataSource(
-        {("LittleBear", 1, 1): EpisodeMetadata("Breakfast", "wake at sunrise")}
+        {("Kipper", 1, 1): EpisodeMetadata("Breakfast", "wake at sunrise")}
     )
     episodes = (
         parse_filename(missing.name),
@@ -117,7 +117,7 @@ def test_not_found_is_listed_and_not_renamed(tmp_path: Path) -> None:
     assert missing.exists()
     assert missing.read_bytes() == b"harry"
     assert not found.exists()
-    assert (tmp_path / "LittleBear_S01E01_MORNING.mp4").exists()
+    assert (tmp_path / "Kipper_S01E01_MORNING.mp4").exists()
     assert "Not found:" in table
     assert "Harry_S01E01.mp4" in table.split("Not found:")[1]
 
@@ -145,20 +145,20 @@ def test_holiday_slug_can_match_christmas_keywords() -> None:
 
 
 def test_apply_skips_when_destination_already_exists(tmp_path: Path) -> None:
-    source_path = tmp_path / "LittleBear_S01E01.mp4"
-    destination = tmp_path / "LittleBear_S01E01_WINTER.mp4"
+    source_path = tmp_path / "Kipper_S01E01.mp4"
+    destination = tmp_path / "Kipper_S01E01_WINTER.mp4"
     source_path.write_bytes(b"new")
     destination.write_bytes(b"old")
     episode = parse_filename(source_path.name)
     metadata = FakeEpisodeMetadataSource(
-        {("LittleBear", 1, 1): EpisodeMetadata("Snow", "sled")}
+        {("Kipper", 1, 1): EpisodeMetadata("Snow", "sled")}
     )
 
     preview = apply_tags(tmp_path, (episode,), metadata, RULES)
 
     assert source_path.exists()
     assert destination.read_bytes() == b"old"
-    assert preview.skipped_filenames == ("LittleBear_S01E01.mp4",)
+    assert preview.skipped_filenames == ("Kipper_S01E01.mp4",)
 
 
 def test_proposed_tag_tokens_cover_each_kind() -> None:
@@ -181,33 +181,33 @@ def test_format_table_lists_skipped_destinations() -> None:
     preview = TagPreview(
         rows=(
             TagPreviewRow(
-                filename="LittleBear_S01E01.mp4",
+                filename="Kipper_S01E01.mp4",
                 title="Snow",
-                proposed_filename="LittleBear_S01E01_WINTER.mp4",
+                proposed_filename="Kipper_S01E01_WINTER.mp4",
                 proposed_tags=("WINTER",),
                 triggers=(),
             ),
         ),
         not_found_filenames=(),
-        skipped_filenames=("LittleBear_S01E01.mp4",),
+        skipped_filenames=("Kipper_S01E01.mp4",),
     )
 
     table = format_tag_preview(preview)
 
     assert "Skipped (destination exists):" in table
-    assert "LittleBear_S01E01.mp4" in table.split("Skipped")[1]
+    assert "Kipper_S01E01.mp4" in table.split("Skipped")[1]
 
 
 def test_format_table_includes_file_title_tags_and_keywords() -> None:
-    episode = parse_filename("LittleBear_S01E01.mp4")
+    episode = parse_filename("Kipper_S01E01.mp4")
     source = FakeEpisodeMetadataSource(
-        {("LittleBear", 1, 1): EpisodeMetadata("Snow Day", "the sled")}
+        {("Kipper", 1, 1): EpisodeMetadata("Snow Day", "the sled")}
     )
 
     table = format_tag_preview(preview_tags((episode,), source, RULES))
 
     assert "FILE" in table
-    assert "LittleBear_S01E01.mp4" in table
+    assert "Kipper_S01E01.mp4" in table
     assert "Snow Day" in table
     assert "WINTER" in table
     assert "snow" in table or "sled" in table

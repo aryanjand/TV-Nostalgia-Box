@@ -3,7 +3,7 @@
 from datetime import date
 
 from tv90.adapters.fake_duration import FakeDurationIndex
-from tv90.config import LITTLE_BEAR_CHANNEL_NUMBER, load_settings
+from tv90.config import KIPPER_CHANNEL_NUMBER, load_settings
 from tv90.domain.filename import parse_filename
 from tv90.domain.holiday_calendar import HolidayCalendar
 from tv90.domain.timeline import DailyTimelineBuilder, Timeline
@@ -11,11 +11,11 @@ from tv90.domain.timeline import DailyTimelineBuilder, Timeline
 FINGERPRINT_DATE = date(1994, 7, 15)
 FINGERPRINT_DURATION_SECONDS = 1800.0
 FINGERPRINT_POOL = (
-    parse_filename("LittleBear_S01E01.mp4"),
-    parse_filename("LittleBear_S01E02_MORNING.mp4"),
-    parse_filename("LittleBear_S01E03_NIGHT.mp4"),
-    parse_filename("LittleBear_S01E04.mp4"),
-    parse_filename("LittleBear_S01E05.mp4"),
+    parse_filename("Kipper_S01E01.mp4"),
+    parse_filename("Kipper_S01E02_MORNING.mp4"),
+    parse_filename("Kipper_S01E03_NIGHT.mp4"),
+    parse_filename("Kipper_S01E04.mp4"),
+    parse_filename("Kipper_S01E05.mp4"),
 )
 
 
@@ -35,7 +35,7 @@ def build_fingerprint_timeline() -> Timeline:
         HolidayCalendar.from_defaults(settings),
         FakeDurationIndex(durations),
     )
-    return builder.build(FINGERPRINT_DATE, LITTLE_BEAR_CHANNEL_NUMBER, FINGERPRINT_POOL)
+    return builder.build(FINGERPRINT_DATE, KIPPER_CHANNEL_NUMBER, FINGERPRINT_POOL)
 
 
 if __name__ == "__main__":

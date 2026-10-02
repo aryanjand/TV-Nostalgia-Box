@@ -31,7 +31,7 @@ OVERLAYROOT_LOCAL="/etc/overlayroot.local.conf"
 # recurse=0 keeps /srv/90stv/library remountable; Bookworm default recurse=1 overlays every mount.
 OVERLAYROOT_LINE='overlayroot="tmpfs:recurse=0"'
 
-DOWNLOAD_LITTLE_BEAR="${SCRIPT_DIR}/scripts/download-little-bear.py"
+DOWNLOAD_KIPPER="${SCRIPT_DIR}/scripts/download-kipper.py"
 DOWNLOAD_OSWALD="${SCRIPT_DIR}/scripts/download-oswald.py"
 DOWNLOAD_HARRY="${SCRIPT_DIR}/scripts/download-harry.py"
 DOWNLOAD_HOLIDAY="${SCRIPT_DIR}/scripts/download-holiday.py"
@@ -513,8 +513,8 @@ run_show_download() {
 }
 
 fetch_remote_shows() {
-  log "media [1/${MEDIA_STEP_COUNT}] Little Bear → ${LIBRARY_PATH}"
-  run_show_download "${DOWNLOAD_LITTLE_BEAR}"
+  log "media [1/${MEDIA_STEP_COUNT}] Kipper → ${LIBRARY_PATH}"
+  run_show_download "${DOWNLOAD_KIPPER}"
   log "media [2/${MEDIA_STEP_COUNT}] Oswald → ${LIBRARY_PATH}"
   run_show_download "${DOWNLOAD_OSWALD}"
   log "media [3/${MEDIA_STEP_COUNT}] Harry → ${LIBRARY_PATH}"
@@ -610,7 +610,7 @@ channel_has_mp4() {
 
 count_health_hits() {
   local n=0
-  prefix_present "LittleBear_" && n=$((n + 1))
+  prefix_present "Kipper_" && n=$((n + 1))
   prefix_present "Oswald_" && n=$((n + 1))
   prefix_present "Harry_" && n=$((n + 1))
   printf '%s\n' "${n}"
@@ -654,7 +654,7 @@ health_check() {
     ready=0
   fi
 
-  print_health_line "LittleBear_ present" "LittleBear_ files" prefix_present "LittleBear_" || ready=0
+  print_health_line "Kipper_ present" "Kipper_ files" prefix_present "Kipper_" || ready=0
   print_health_line "Oswald_ present" "Oswald_ files" prefix_present "Oswald_" || ready=0
   print_health_line "Harry_ present" "Harry_ files" prefix_present "Harry_" || ready=0
   print_health_line "interstitials ch01 mp4" "interstitials/ch01 mp4" channel_has_mp4 ch01 || ready=0
@@ -755,7 +755,7 @@ main() {
     if overlay_should_enable; then
       ensure_overlay
     else
-      log "skip overlay until Little Bear, Oswald, Harry, and ch01–ch03 bumpers are present (re-run setup.sh after a full fetch, or use --skip-media)"
+      log "skip overlay until Kipper, Oswald, Harry, and ch01–ch03 bumpers are present (re-run setup.sh after a full fetch, or use --skip-media)"
     fi
   fi
   print_next_steps

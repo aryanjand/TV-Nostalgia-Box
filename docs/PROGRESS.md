@@ -9,7 +9,7 @@ review, and a clean commit history are the quality gates.
 This box is a safe, passive routine for a 2-year-old: cognitive calm, developmental
 consistency, and stress-free entertainment. Prefer those over engagement metrics.
 
-1. Slow pacing. Library is Little Bear, Oswald, and Harry. Do not add high-stimulation titles.
+1. Slow pacing. Library is Kipper, Oswald, and Harry. Do not add high-stimulation titles.
 2. Predictability over novelty. Closed ~140-episode library of the same three friends.
 3. Gentle environmental connection via filename tags and the scheduler.
 4. Zero decision fatigue: no menus, episode lists, search, thumbnails, or Up Next.
@@ -280,7 +280,7 @@ Update this file as tasks finish. Include implementer assumptions and the
 
 - Status: done. Reviewer APPROVE. Orchestrator `make check`: 753 passed, coverage 99.38%.
 - Commits: `0d2fc1e` keywords; `ff252ba` TVMaze; `39ffac3` tag/index CLI.
-- Metadata: TVMaze ids Little Bear 18005, Oswald 43569, Harry 69573.
+- Metadata: TVMaze ids Kipper 18014, Oswald 43569, Harry 69573.
 
 ### T15
 

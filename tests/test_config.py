@@ -10,8 +10,8 @@ from tv90.config import (
     HARRY_SHOW_STEM,
     HOLIDAY_CHANNEL_NUMBER,
     HOLIDAY_SHOW_STEM,
-    LITTLE_BEAR_CHANNEL_NUMBER,
-    LITTLE_BEAR_SHOW_STEM,
+    KIPPER_CHANNEL_NUMBER,
+    KIPPER_SHOW_STEM,
     OSWALD_CHANNEL_NUMBER,
     OSWALD_SHOW_STEM,
     SPRING_MONTHS,
@@ -189,14 +189,14 @@ def test_load_settings_rejects_night_lock_outside_day() -> None:
 
 
 def test_show_stems_match_filename_scheme() -> None:
-    assert LITTLE_BEAR_SHOW_STEM == "LittleBear"
+    assert KIPPER_SHOW_STEM == "Kipper"
     assert OSWALD_SHOW_STEM == "Oswald"
     assert HARRY_SHOW_STEM == "Harry"
     assert HOLIDAY_SHOW_STEM == "Holiday"
 
 
 def test_channel_numbers_are_one_through_four() -> None:
-    assert LITTLE_BEAR_CHANNEL_NUMBER == 1
+    assert KIPPER_CHANNEL_NUMBER == 1
     assert OSWALD_CHANNEL_NUMBER == 2
     assert HARRY_CHANNEL_NUMBER == 3
     assert HOLIDAY_CHANNEL_NUMBER == 4

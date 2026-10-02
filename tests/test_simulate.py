@@ -22,17 +22,17 @@ JULY_FIFTEENTH = date(2024, 7, 15)
 HALLOWEEN_2024 = date(2024, 10, 31)
 BROADCAST_DAY_SECONDS = (21.0 - 6.5) * 3600.0
 
-LITTLE_BEAR = parse_filename("LittleBear_S01E01.mp4")
+KIPPER = parse_filename("Kipper_S01E01.mp4")
 OSWALD = parse_filename("Oswald_S01E01.mp4")
 HARRY = parse_filename("Harry_S01E01.mp4")
 HALLOWEEN_MOVIE = parse_filename("Holiday_GreatPumpkin_HALLOWEEN.mp4")
 CHRISTMAS_MOVIE = parse_filename("Holiday_Rudolph_CHRISTMAS.mp4")
 TINY_LIBRARY = FakeLibrarySource(
-    episodes=(LITTLE_BEAR, OSWALD, HARRY, HALLOWEEN_MOVIE, CHRISTMAS_MOVIE)
+    episodes=(KIPPER, OSWALD, HARRY, HALLOWEEN_MOVIE, CHRISTMAS_MOVIE)
 )
 TINY_DURATIONS = FakeDurationIndex(
     {
-        LITTLE_BEAR.filename: BROADCAST_DAY_SECONDS,
+        KIPPER.filename: BROADCAST_DAY_SECONDS,
         OSWALD.filename: BROADCAST_DAY_SECONDS,
         HARRY.filename: BROADCAST_DAY_SECONDS,
         HALLOWEEN_MOVIE.filename: BROADCAST_DAY_SECONDS,
@@ -94,12 +94,12 @@ def test_format_channel_header_rejects_unknown_channel() -> None:
 def test_simulate_schedule_on_non_holiday_prints_cartoon_channels_only() -> None:
     output = _simulate(JULY_FIFTEENTH)
 
-    assert "CH 01 Little Bear" in output
+    assert "CH 01 Kipper" in output
     assert "CH 02 Oswald" in output
     assert "CH 03 Harry and His Bucket Full of Dinosaurs" in output
     assert "CH 04" not in output
     assert "6:30 AM" in output
-    assert LITTLE_BEAR.filename in output
+    assert KIPPER.filename in output
     assert OSWALD.filename in output
     assert HARRY.filename in output
     assert HALLOWEEN_MOVIE.filename not in output
@@ -108,7 +108,7 @@ def test_simulate_schedule_on_non_holiday_prints_cartoon_channels_only() -> None
 def test_simulate_schedule_on_holiday_includes_channel_four() -> None:
     output = _simulate(HALLOWEEN_2024)
 
-    assert "CH 01 Little Bear" in output
+    assert "CH 01 Kipper" in output
     assert "CH 04 Holiday movies" in output
     assert HALLOWEEN_MOVIE.filename in output
     assert CHRISTMAS_MOVIE.filename not in output
@@ -127,10 +127,7 @@ def test_simulate_schedule_is_a_text_dump_not_a_picker() -> None:
 def test_fallback_duration_uses_named_cartoon_and_holiday_constants() -> None:
     index = FallbackDurationIndex()
 
-    assert (
-        index.duration_seconds(LITTLE_BEAR.filename)
-        == CARTOON_FALLBACK_DURATION_SECONDS
-    )
+    assert index.duration_seconds(KIPPER.filename) == CARTOON_FALLBACK_DURATION_SECONDS
     assert (
         index.duration_seconds(HALLOWEEN_MOVIE.filename)
         == HOLIDAY_MOVIE_FALLBACK_DURATION_SECONDS

@@ -20,10 +20,10 @@ from tv90.domain.time_weight import (
 GAUSSIAN_ONE_STANDARD_DEVIATION = 0.6065306597126334
 GAUSSIAN_TWO_STANDARD_DEVIATIONS = 0.1353352832366127
 
-MORNING_EPISODE = parse_filename("LittleBear_S01E04_MORNING.mp4")
+MORNING_EPISODE = parse_filename("Kipper_S01E04_MORNING.mp4")
 NIGHT_EPISODE = parse_filename("Oswald_S01E09_NIGHT.mp4")
 GENERAL_EPISODE = parse_filename("Harry_S01E01.mp4")
-GENERAL_DAY_TAG_EPISODE = parse_filename("LittleBear_S01E01_DAY.mp4")
+GENERAL_DAY_TAG_EPISODE = parse_filename("Kipper_S01E01_DAY.mp4")
 HOLIDAY_GENERAL_EPISODE = parse_filename("Holiday_Rudolph_CHRISTMAS.mp4")
 
 

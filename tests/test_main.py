@@ -35,11 +35,11 @@ from tv90.ports.player import format_channel_banner
 
 VANCOUVER = ZoneInfo("America/Vancouver")
 JULY_MORNING = datetime(2024, 7, 15, 7, 0, tzinfo=VANCOUVER)
-LITTLE_BEAR_ONE = parse_filename("LittleBear_S01E01.mp4")
-LITTLE_BEAR_TWO = parse_filename("LittleBear_S01E02.mp4")
+KIPPER_ONE = parse_filename("Kipper_S01E01.mp4")
+KIPPER_TWO = parse_filename("Kipper_S01E02.mp4")
 OSWALD_ONE = parse_filename("Oswald_S01E01.mp4")
 HARRY_ONE = parse_filename("Harry_S01E01.mp4")
-DAYTIME_LIBRARY = (LITTLE_BEAR_ONE, LITTLE_BEAR_TWO, OSWALD_ONE, HARRY_ONE)
+DAYTIME_LIBRARY = (KIPPER_ONE, KIPPER_TWO, OSWALD_ONE, HARRY_ONE)
 HOUR_DURATIONS = {
     episode.filename: float(SECONDS_PER_HOUR) for episode in DAYTIME_LIBRARY
 }
@@ -79,7 +79,7 @@ def test_build_runtime_with_fakes_now_playing_works() -> None:
     assert runtime.controller.now_playing() == NOW_PLAYING_SLATE
     runtime.controller.channel_up()
     playing = runtime.controller.now_playing()
-    assert playing.startswith(f"{format_channel_banner(1)} LittleBear_")
+    assert playing.startswith(f"{format_channel_banner(1)} Kipper_")
 
 
 def test_build_runtime_defaults_library_path_to_srv_mount() -> None:
@@ -151,10 +151,10 @@ def test_library_path_player_resolves_basenames_for_mpv() -> None:
         inner, Path("/srv/90stv/library"), Path("/srv/90stv/interstitials")
     )
 
-    player.load(LITTLE_BEAR_ONE.filename, 12.0)
+    player.load(KIPPER_ONE.filename, 12.0)
 
     assert inner.commands == (
-        LoadCommand("/srv/90stv/library/LittleBear_S01E01.mp4", 12.0),
+        LoadCommand("/srv/90stv/library/Kipper_S01E01.mp4", 12.0),
     )
 
 
@@ -215,20 +215,20 @@ def test_build_runtime_wires_injected_interstitial_catalog() -> None:
 
 def test_library_path_prober_resolves_basenames_for_ffprobe() -> None:
     prober = LibraryPathProber(
-        FakeMediaProber({"/srv/90stv/library/LittleBear_S01E01.mp4": 420.0}),
+        FakeMediaProber({"/srv/90stv/library/Kipper_S01E01.mp4": 420.0}),
         Path("/srv/90stv/library"),
     )
 
-    assert prober.duration_seconds(LITTLE_BEAR_ONE.filename) == 420.0
+    assert prober.duration_seconds(KIPPER_ONE.filename) == 420.0
 
 
 def test_absent_duration_index_is_unknown_when_file_missing(tmp_path: Path) -> None:
     index = AbsentFileDurationIndex(tmp_path / DURATION_INDEX_FILENAME)
 
     try:
-        index.duration_seconds(LITTLE_BEAR_ONE.filename)
+        index.duration_seconds(KIPPER_ONE.filename)
     except DurationUnknownError as error:
-        assert error.filename == LITTLE_BEAR_ONE.filename
+        assert error.filename == KIPPER_ONE.filename
     else:
         raise AssertionError("missing duration index must be a miss, not a crash")
 

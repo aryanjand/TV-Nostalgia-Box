@@ -89,7 +89,7 @@ def test_setup_script_supports_non_root_and_skip_media() -> None:
 
 
 def test_setup_script_fetches_shows_and_interstitials() -> None:
-    assert "download-little-bear" in SETUP_SCRIPT
+    assert "download-kipper" in SETUP_SCRIPT
     assert "download-oswald" in SETUP_SCRIPT
     assert "download-harry" in SETUP_SCRIPT
     assert "download-holiday" in SETUP_SCRIPT

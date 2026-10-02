@@ -43,8 +43,8 @@ from tv90.ports.player import (
     format_volume_bar,
 )
 
-LITTLE_BEAR_FILENAME = "LittleBear_S01E01.mp4"
-LITTLE_BEAR_NEXT_FILENAME = "LittleBear_S01E02.mp4"
+KIPPER_FILENAME = "Kipper_S01E01.mp4"
+KIPPER_NEXT_FILENAME = "Kipper_S01E02.mp4"
 OSWALD_FILENAME = "Oswald_S01E01.mp4"
 LIBRARY_EPISODE_BYTES = b"episode-bytes"
 
@@ -71,12 +71,12 @@ def test_format_volume_bar_uses_twenty_classic_segments() -> None:
 def test_fake_player_load_seeks_to_offset_and_records_command() -> None:
     player = _player()
 
-    player.load(LITTLE_BEAR_FILENAME, 17.5)
+    player.load(KIPPER_FILENAME, 17.5)
 
-    assert player.current_filename == LITTLE_BEAR_FILENAME
+    assert player.current_filename == KIPPER_FILENAME
     assert player.offset_seconds == 17.5
     assert player.showing_slate is False
-    assert player.commands == (LoadCommand(LITTLE_BEAR_FILENAME, 17.5),)
+    assert player.commands == (LoadCommand(KIPPER_FILENAME, 17.5),)
 
 
 def test_fake_player_play_interstitial_is_not_a_fade() -> None:
@@ -93,12 +93,12 @@ def test_fake_player_fade_to_next_and_tune_to_are_different_events() -> None:
     player = _player()
     settings = load_settings({})
 
-    player.fade_to_next(LITTLE_BEAR_NEXT_FILENAME, 0.0)
+    player.fade_to_next(KIPPER_NEXT_FILENAME, 0.0)
     player.tune_to(OSWALD_FILENAME, 8.25)
 
     fade_command, tuner_command = player.commands
     assert fade_command == FadeJoinCommand(
-        filename=LITTLE_BEAR_NEXT_FILENAME,
+        filename=KIPPER_NEXT_FILENAME,
         offset_seconds=0.0,
         fade_seconds=settings.episode_join_fade_seconds,
     )
@@ -116,7 +116,7 @@ def test_fake_player_fade_to_next_and_tune_to_are_different_events() -> None:
 
 def test_fake_player_show_slate_uses_named_calm_color() -> None:
     player = _player()
-    player.load(LITTLE_BEAR_FILENAME, 4.0)
+    player.load(KIPPER_FILENAME, 4.0)
 
     player.show_slate()
 
@@ -216,20 +216,20 @@ def test_fake_player_volume_bar_rejects_invalid_volume(volume: float) -> None:
 
 def test_fake_player_playback_has_ended_query_does_not_clear() -> None:
     player = _player()
-    player.load(LITTLE_BEAR_FILENAME, 0.0)
+    player.load(KIPPER_FILENAME, 0.0)
 
     assert player.playback_has_ended() is False
     player.mark_playback_ended()
     assert player.playback_has_ended() is True
     assert player.playback_has_ended() is True
 
-    player.load(LITTLE_BEAR_NEXT_FILENAME, 1.0)
+    player.load(KIPPER_NEXT_FILENAME, 1.0)
     assert player.playback_has_ended() is False
 
 
 def test_fake_player_stop_clears_playback_and_records() -> None:
     player = _player()
-    player.load(LITTLE_BEAR_FILENAME, 9.0)
+    player.load(KIPPER_FILENAME, 9.0)
     player.mark_playback_ended()
 
     player.stop()
@@ -252,10 +252,10 @@ def test_fake_player_satisfies_player_protocol() -> None:
     player: Player = _player()
 
     player.set_volume(0.4)
-    player.load(LITTLE_BEAR_FILENAME, 12.0)
+    player.load(KIPPER_FILENAME, 12.0)
     player.show_channel_banner(3)
     player.show_volume_bar(0.4)
-    player.fade_to_next(LITTLE_BEAR_NEXT_FILENAME, 0.0)
+    player.fade_to_next(KIPPER_NEXT_FILENAME, 0.0)
     player.tune_to(OSWALD_FILENAME, 5.0)
     player.play_interstitial("ch01/break.mp4", 0.0)
     player.show_slate()
@@ -267,7 +267,7 @@ def test_fake_player_satisfies_player_protocol() -> None:
 def test_fake_player_does_not_write_library_files(tmp_path: Path) -> None:
     library = tmp_path / "library"
     library.mkdir()
-    episode = library / LITTLE_BEAR_FILENAME
+    episode = library / KIPPER_FILENAME
     episode.write_bytes(LIBRARY_EPISODE_BYTES)
     before = _library_snapshot(library)
     player = _player()
@@ -354,10 +354,10 @@ def _overlay_commands(
 
 def _exercise_player(player: Player) -> None:
     player.set_volume(0.4)
-    player.load(LITTLE_BEAR_FILENAME, 12.0)
+    player.load(KIPPER_FILENAME, 12.0)
     player.show_channel_banner(3)
     player.show_volume_bar(0.4)
-    player.fade_to_next(LITTLE_BEAR_NEXT_FILENAME, 0.0)
+    player.fade_to_next(KIPPER_NEXT_FILENAME, 0.0)
     player.tune_to(OSWALD_FILENAME, 5.0)
     player.play_interstitial("ch01/break.mp4", 0.0)
     player.show_slate()
@@ -367,13 +367,13 @@ def _exercise_player(player: Player) -> None:
 def test_mpv_load_sends_loadfile_with_start_offset() -> None:
     player, sender, _waiter = _mpv_player()
 
-    player.load(LITTLE_BEAR_FILENAME, 17.5)
+    player.load(KIPPER_FILENAME, 17.5)
 
     loadfiles = _commands_named(sender.payloads, "loadfile")
     assert loadfiles == [
         [
             "loadfile",
-            LITTLE_BEAR_FILENAME,
+            KIPPER_FILENAME,
             "replace",
             -1,
             "start=17.5",
@@ -462,7 +462,7 @@ def test_mpv_fade_and_tune_send_different_commands() -> None:
     waiter = RecordingWait()
     player = MpvIpcPlayer(settings, sender, wait=waiter)
 
-    player.fade_to_next(LITTLE_BEAR_NEXT_FILENAME, 0.0)
+    player.fade_to_next(KIPPER_NEXT_FILENAME, 0.0)
     fade_payloads = list(sender.payloads)
     player.tune_to(OSWALD_FILENAME, 8.25)
     tune_payloads = sender.payloads[len(fade_payloads) :]
@@ -578,7 +578,7 @@ def test_mpv_load_discards_stale_end_events() -> None:
     )
     player, _sender, _waiter = _mpv_player(reader=reader)
 
-    player.load(LITTLE_BEAR_FILENAME, 0.0)
+    player.load(KIPPER_FILENAME, 0.0)
 
     assert player.playback_has_ended() is False
 
@@ -625,7 +625,7 @@ def test_fake_and_mpv_satisfy_player_contract() -> None:
 def test_mpv_adapter_does_not_write_library_files(tmp_path: Path) -> None:
     library = tmp_path / "library"
     library.mkdir()
-    episode = library / LITTLE_BEAR_FILENAME
+    episode = library / KIPPER_FILENAME
     episode.write_bytes(LIBRARY_EPISODE_BYTES)
     before = _library_snapshot(library)
     player, _sender, _waiter = _mpv_player()
@@ -752,7 +752,7 @@ def test_mpv_session_queues_events_arriving_before_a_reply() -> None:
     )
     session = MpvIpcSession(transport)
 
-    reply = session.send({"command": ["loadfile", LITTLE_BEAR_FILENAME, "replace"]})
+    reply = session.send({"command": ["loadfile", KIPPER_FILENAME, "replace"]})
 
     assert reply == {"error": "success"}
     assert session.read_event() == {

@@ -10,8 +10,8 @@ from tv90.config import (
     HARRY_SHOW_STEM,
     HOLIDAY_CHANNEL_NUMBER,
     HOLIDAY_SHOW_STEM,
-    LITTLE_BEAR_CHANNEL_NUMBER,
-    LITTLE_BEAR_SHOW_STEM,
+    KIPPER_CHANNEL_NUMBER,
+    KIPPER_SHOW_STEM,
     OSWALD_CHANNEL_NUMBER,
     OSWALD_SHOW_STEM,
     Settings,
@@ -20,12 +20,12 @@ from tv90.domain.episode import Episode
 from tv90.domain.holiday_calendar import HolidayCalendar
 
 CARTOON_CHANNEL_NUMBERS = (
-    LITTLE_BEAR_CHANNEL_NUMBER,
+    KIPPER_CHANNEL_NUMBER,
     OSWALD_CHANNEL_NUMBER,
     HARRY_CHANNEL_NUMBER,
 )
 CARTOON_SHOW_STEM_BY_CHANNEL = {
-    LITTLE_BEAR_CHANNEL_NUMBER: LITTLE_BEAR_SHOW_STEM,
+    KIPPER_CHANNEL_NUMBER: KIPPER_SHOW_STEM,
     OSWALD_CHANNEL_NUMBER: OSWALD_SHOW_STEM,
     HARRY_CHANNEL_NUMBER: HARRY_SHOW_STEM,
 }
@@ -60,7 +60,7 @@ class ChannelLineup:
 
     def coerce_current_channel(self, current: int, on_date: date) -> int:
         if self._is_leftover_holiday_channel(current, on_date):
-            return LITTLE_BEAR_CHANNEL_NUMBER
+            return KIPPER_CHANNEL_NUMBER
         channels = self.channels_on(on_date)
         if current not in channels:
             raise UnknownChannelError(current)
@@ -68,7 +68,7 @@ class ChannelLineup:
 
     def _neighbor(self, current: int, on_date: date, step: int) -> int:
         if self._is_leftover_holiday_channel(current, on_date):
-            return LITTLE_BEAR_CHANNEL_NUMBER
+            return KIPPER_CHANNEL_NUMBER
         channels = self.channels_on(on_date)
         try:
             index = channels.index(current)
