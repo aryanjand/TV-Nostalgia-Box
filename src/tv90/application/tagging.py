@@ -7,6 +7,12 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+from tv90.application.paired_broadcast import (
+    catalog_short_numbers,
+    fallback_broadcast_title,
+    join_short_metadata,
+    uses_paired_shorts,
+)
 from tv90.config import HOLIDAY_SHOW_STEM
 from tv90.domain.episode import (
     DAYPART_TAG_MORNING,
@@ -191,6 +197,10 @@ def _title_and_description(
         # Holiday movies have a title slug, not SxxExx, so there is nothing to look up.
         return episode.holiday_title_slug().replace("_", HOLIDAY_SLUG_SPACE), ""
     season_number, episode_number = episode.cartoon_season_and_episode()
+    if uses_paired_shorts(episode.show_stem):
+        return _paired_title_and_description(
+            episode, season_number, episode_number, metadata_source, not_found
+        )
     try:
         metadata = metadata_source.lookup(
             episode.show_stem, season_number, episode_number
@@ -199,6 +209,33 @@ def _title_and_description(
         not_found.append(episode.filename)
         return None, ""
     return metadata.title, metadata.description
+
+
+def _paired_title_and_description(
+    episode: Episode,
+    season_number: int,
+    episode_number: int,
+    metadata_source: EpisodeMetadataSource,
+    not_found: list[str],
+) -> tuple[str | None, str]:
+    parts = []
+    for short_number in catalog_short_numbers(episode_number):
+        try:
+            parts.append(
+                metadata_source.lookup(episode.show_stem, season_number, short_number)
+            )
+        except EpisodeMetadataNotFoundError:
+            continue
+    if parts:
+        joined = join_short_metadata(parts)
+        return joined.title, joined.description
+    fallback = fallback_broadcast_title(
+        episode.show_stem, season_number, episode_number
+    )
+    if fallback is not None:
+        return fallback, ""
+    not_found.append(episode.filename)
+    return None, ""
 
 
 def _format_proposed_tags(tags: tuple[str, ...]) -> str:

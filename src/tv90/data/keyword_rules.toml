@@ -1,9 +1,21 @@
 # Whole-word, case-insensitive keywords → scheduler tags.
 # Edit this file to add household words. Do not add Python if/else for keywords.
+# Dress-up "costume" is not Halloween. "swim" does not match "swimming".
 
 [[rule]]
 tag = "WINTER"
-keywords = ["snow", "sled", "ice", "snowy", "snowing", "winter", "frozen", "blizzard"]
+keywords = [
+    "snow",
+    "sled",
+    "ice",
+    "snowy",
+    "snowing",
+    "winter",
+    "frozen",
+    "blizzard",
+    "igloo",
+    "freeze",
+]
 
 [[rule]]
 tag = "SPRING"
@@ -11,11 +23,21 @@ keywords = ["spring", "bloom", "blossom", "tulip", "nest", "hatch"]
 
 [[rule]]
 tag = "SUMMER"
-keywords = ["summer", "beach", "swim", "picnic", "ice cream"]
+keywords = [
+    "summer",
+    "beach",
+    "seaside",
+    "swim",
+    "swimming",
+    "paddling pool",
+    "picnic",
+    "ice cream",
+    "seashell",
+]
 
 [[rule]]
 tag = "AUTUMN"
-keywords = ["autumn", "harvest", "foliage", "acorn"]
+keywords = ["autumn", "harvest", "foliage", "acorn", "conker"]
 
 [[rule]]
 tag = "MORNING"
@@ -27,7 +49,7 @@ keywords = ["moon", "bedtime", "sleep", "stars", "pajamas", "night", "goodnight"
 
 [[rule]]
 tag = "HALLOWEEN"
-keywords = ["pumpkin", "costume", "halloween"]
+keywords = ["pumpkin", "halloween"]
 
 [[rule]]
 tag = "THANKSGIVING"

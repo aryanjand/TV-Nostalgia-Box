@@ -54,6 +54,13 @@ def test_pumpkin_matches_halloween() -> None:
     assert matches[0].keywords == ("pumpkin", "costume")
 
 
+def test_packaged_rules_do_not_treat_costume_party_as_halloween() -> None:
+    rules = parse_keyword_rules(RULES_PATH.read_text(encoding="utf-8"))
+    matches = match_keywords("The Costume Party", "", rules)
+
+    assert all(match.tag != "HALLOWEEN" for match in matches)
+
+
 def test_ice_does_not_match_inside_nice() -> None:
     matches = match_keywords("A Nice Day", "", STARTING_RULES)
 
@@ -98,6 +105,62 @@ def test_packaged_rules_cover_starting_examples_and_extra_seasons() -> None:
         "EASTER",
     }
     assert ice_cream.episode.season_tag is SeasonTag.SUMMER
+
+
+@pytest.mark.parametrize(
+    ("title", "description", "season_tag", "daypart", "holiday_tag"),
+    [
+        (
+            "The Visitor",
+            "Kipper is disturbed by a visitor in the night.",
+            None,
+            Daypart.NIGHT,
+            None,
+        ),
+        ("The Seaside", "", SeasonTag.SUMMER, Daypart.GENERAL, None),
+        ("Snowy Day", "", SeasonTag.WINTER, Daypart.GENERAL, None),
+        ("The Paddling Pool", "", SeasonTag.SUMMER, Daypart.GENERAL, None),
+        ("The Conker Tree", "", SeasonTag.AUTUMN, Daypart.GENERAL, None),
+        ("Sleepless Night", "", None, Daypart.NIGHT, None),
+        ("The Igloo", "", SeasonTag.WINTER, Daypart.GENERAL, None),
+        ("The Nest", "", SeasonTag.SPRING, Daypart.GENERAL, None),
+        ("The Picnic", "", SeasonTag.SUMMER, Daypart.GENERAL, None),
+        ("Tiger's Sled", "", SeasonTag.WINTER, Daypart.GENERAL, None),
+        ("The Swimming Pool", "", SeasonTag.SUMMER, Daypart.GENERAL, None),
+        ("Christmas Eve", "", None, Daypart.GENERAL, HolidayTag.CHRISTMAS),
+        ("The Big Freeze", "", SeasonTag.WINTER, Daypart.GENERAL, None),
+        ("The Costume Party", "", None, Daypart.GENERAL, None),
+        ("The Umbrella", "", None, Daypart.GENERAL, None),
+        ("Nothing Ever Happens", "", None, Daypart.GENERAL, None),
+        ("Tiger's Cold", "", None, Daypart.GENERAL, None),
+        ("The Little Ghost", "", None, Daypart.GENERAL, None),
+        ("The Holiday", "", None, Daypart.GENERAL, None),
+        ("Skates", "", None, Daypart.GENERAL, None),
+        ("Chasing the Ice-Cream Truck", "", SeasonTag.SUMMER, Daypart.GENERAL, None),
+        ("Autumn Leaves", "", SeasonTag.AUTUMN, Daypart.GENERAL, None),
+        ("A Day at the Beach", "", SeasonTag.SUMMER, Daypart.GENERAL, None),
+        ("What's for Breakfast?", "", None, Daypart.MORNING, None),
+        ("I See a Seashell!", "", SeasonTag.SUMMER, Daypart.GENERAL, None),
+    ],
+)
+def test_packaged_rules_tag_library_titles_accurately(
+    title: str,
+    description: str,
+    season_tag: SeasonTag | None,
+    daypart: Daypart,
+    holiday_tag: HolidayTag | None,
+) -> None:
+    rules = parse_keyword_rules(RULES_PATH.read_text(encoding="utf-8"))
+    proposal = propose_tagged_episode(
+        parse_filename("Kipper_S01E01.mp4"),
+        match_keywords(title, description, rules),
+    )
+
+    assert proposal.episode.season_tag is (
+        season_tag if season_tag is not None else SeasonTag.EVERGREEN
+    )
+    assert proposal.episode.daypart is daypart
+    assert proposal.episode.holiday_tag is holiday_tag
 
 
 def test_existing_morning_is_kept_when_night_keywords_match() -> None:

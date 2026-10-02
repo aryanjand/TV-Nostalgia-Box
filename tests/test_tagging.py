@@ -96,6 +96,60 @@ def test_unmatched_episode_stays_untagged(tmp_path: Path) -> None:
     assert path.name in table
 
 
+def test_oswald_broadcast_tags_from_either_short() -> None:
+    episode = parse_filename("Oswald_S01E11.mp4")
+    source = FakeEpisodeMetadataSource(
+        {
+            ("Oswald", 1, 21): EpisodeMetadata("The Go-Kart Race", ""),
+            ("Oswald", 1, 22): EpisodeMetadata("Autumn Leaves", ""),
+        }
+    )
+
+    preview = preview_tags((episode,), source, RULES)
+
+    assert preview.rows[0].title == "The Go-Kart Race / Autumn Leaves"
+    assert preview.rows[0].proposed_tags == ("AUTUMN",)
+    assert preview.not_found_filenames == ()
+
+
+def test_oswald_ice_cream_short_still_tags_the_half_hour_summer() -> None:
+    episode = parse_filename("Oswald_S01E01.mp4")
+    source = FakeEpisodeMetadataSource(
+        {
+            ("Oswald", 1, 1): EpisodeMetadata("Chasing the Ice-Cream Truck", ""),
+            ("Oswald", 1, 2): EpisodeMetadata("The Camping Trip", ""),
+        }
+    )
+
+    preview = preview_tags((episode,), source, RULES)
+
+    assert preview.rows[0].proposed_tags == ("SUMMER",)
+    assert "Ice-Cream" in preview.rows[0].title
+
+
+def test_paired_broadcast_uses_the_short_that_exists() -> None:
+    episode = parse_filename("Harry_S01E11.mp4")
+    source = FakeEpisodeMetadataSource(
+        {("Harry", 1, 22): EpisodeMetadata("I Promise!", "")}
+    )
+
+    preview = preview_tags((episode,), source, RULES)
+
+    assert preview.rows[0].title == "I Promise!"
+    assert preview.not_found_filenames == ()
+
+
+def test_harry_season_two_uses_packaged_broadcast_titles() -> None:
+    episode = parse_filename("Harry_S02E10.mp4")
+    source = FakeEpisodeMetadataSource({})
+
+    preview = preview_tags((episode,), source, RULES)
+
+    assert preview.rows[0].title == "I See a Seashell! / Jump"
+    assert preview.rows[0].proposed_tags == ("SUMMER",)
+    assert preview.not_found_filenames == ()
+
+
 def test_not_found_is_listed_and_not_renamed(tmp_path: Path) -> None:
     missing = tmp_path / "Harry_S01E01.mp4"
     found = tmp_path / "Kipper_S01E01.mp4"
