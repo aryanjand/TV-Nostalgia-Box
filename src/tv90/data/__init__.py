@@ -1,1 +1,1 @@
-"""Packaged maintenance data. Keyword rules are the TOML file beside this module."""
+"""Packaged maintenance data: keyword rules and episode plots."""

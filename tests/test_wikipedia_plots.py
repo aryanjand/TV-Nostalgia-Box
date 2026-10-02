@@ -124,19 +124,73 @@ def test_harry_season_two_fallback_uses_wiki_plots() -> None:
     assert "beach" in source.description_for_title("Harry", preview.rows[0].title)
 
 
-def test_wikipedia_http_failure_leaves_empty_plots() -> None:
+def test_wikipedia_http_failure_keeps_packaged_plots() -> None:
     def fail(url: str, headers: dict[str, str]) -> str:
         raise OSError("network down")
 
     index = WikipediaPlotIndex(fail)
 
+    assert "gosling" in index.description_for_title("Kipper", "The Visitor")
+
+
+def test_wikipedia_http_failure_without_packaged_is_empty() -> None:
+    def fail(url: str, headers: dict[str, str]) -> str:
+        raise OSError("network down")
+
+    index = WikipediaPlotIndex(fail, packaged={})
+
     assert index.description_for_title("Kipper", "The Visitor") == ""
 
 
-def test_wikipedia_non_parse_json_is_empty() -> None:
-    index = WikipediaPlotIndex(lambda url, headers: json.dumps([1, 2, 3]))
+def test_wikipedia_non_parse_json_without_packaged_is_empty() -> None:
+    index = WikipediaPlotIndex(lambda url, headers: json.dumps([1, 2, 3]), packaged={})
 
     assert index.description_for_title("Kipper", "The Visitor") == ""
+
+
+def test_packaged_plots_tag_hiccups_from_description() -> None:
+    inner = FakeEpisodeMetadataSource(
+        {("Kipper", 2, 5): EpisodeMetadata("Hiccups", "")}
+    )
+    source = WikipediaEnrichedMetadataSource(inner, WikipediaPlotIndex())
+
+    preview = preview_tags(
+        (parse_filename("Kipper_S02E05.mp4"),), source, packaged_keyword_rules()
+    )
+
+    assert preview.rows[0].proposed_tags == ("SUMMER",)
+    assert source.packaged_plot_count() >= 200
+
+
+def test_packaged_plots_tag_harry_nightmare() -> None:
+    inner = FakeEpisodeMetadataSource(
+        {
+            ("Harry", 1, 1): EpisodeMetadata("Aaagh!", ""),
+            ("Harry", 1, 2): EpisodeMetadata("Overdue!", ""),
+        }
+    )
+    source = WikipediaEnrichedMetadataSource(inner, WikipediaPlotIndex())
+
+    preview = preview_tags(
+        (parse_filename("Harry_S01E01.mp4"),), source, packaged_keyword_rules()
+    )
+
+    assert preview.rows[0].proposed_tags == ("NIGHT",)
+
+
+def test_note_suffix_is_stripped_from_plot() -> None:
+    template = (
+        "{{Episode list\n"
+        "| Title=Arnold's Balloon Trip\n"
+        "| ShortSummary=Arnold floats to an ice cream mountain. "
+        "Note: This was on the Christmas Eve VHS.\n"
+        "}}\n"
+    )
+    plots = parse_episode_list_plots(template)
+    summary = plots[normalize_plot_title("Arnold's Balloon Trip")]
+
+    assert "ice cream" in summary
+    assert "Christmas" not in summary
 
 
 def _plot_http(wikitext: str):

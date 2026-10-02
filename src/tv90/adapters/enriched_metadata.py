@@ -27,3 +27,6 @@ class WikipediaEnrichedMetadataSource:
 
     def description_for_title(self, show_stem: str, title: str) -> str:
         return self._plots.description_for_title(show_stem, title)
+
+    def packaged_plot_count(self) -> int:
+        return self._plots.packaged_plot_count()

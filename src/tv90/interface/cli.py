@@ -221,6 +221,7 @@ def _run_tag_preview(
         library_directory, metadata_source, http_get, writable=False
     )
     stdout.write(format_tag_preview(preview_tags(episodes, source, rules)))
+    _write_plot_count(stdout, source)
     return SUCCESS_EXIT_CODE
 
 
@@ -236,6 +237,7 @@ def _run_tag_apply(
     stdout.write(
         format_tag_preview(apply_tags(resolved_library, episodes, source, rules))
     )
+    _write_plot_count(stdout, source)
     return SUCCESS_EXIT_CODE
 
 
@@ -263,9 +265,18 @@ def _tag_inputs(
                 writable=writable,
                 http_get=getter,
             ),
-            WikipediaPlotIndex(getter),
+            WikipediaPlotIndex(),
         )
     return resolved_library, library.episodes(), source, packaged_keyword_rules()
+
+
+def _write_plot_count(stdout: TextIO, source: EpisodeMetadataSource) -> None:
+    count = getattr(source, "packaged_plot_count", None)
+    if not callable(count):
+        return
+    loaded = count()
+    if isinstance(loaded, int):
+        stdout.write(f"Plots: {loaded} packaged descriptions\n")
 
 
 def _run_index(

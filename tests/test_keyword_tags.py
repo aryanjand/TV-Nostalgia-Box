@@ -61,6 +61,30 @@ def test_packaged_rules_do_not_treat_costume_party_as_halloween() -> None:
     assert all(match.tag != "HALLOWEEN" for match in matches)
 
 
+def test_wake_in_its_wake_is_not_morning() -> None:
+    rules = parse_keyword_rules(RULES_PATH.read_text(encoding="utf-8"))
+    matches = match_keywords(
+        "The Nanosaurus",
+        "follow the trail of wreckage left in its wake",
+        rules,
+    )
+
+    assert all(match.tag != "MORNING" for match in matches)
+
+
+def test_title_night_beats_description_breakfast() -> None:
+    rules = parse_keyword_rules(RULES_PATH.read_text(encoding="utf-8"))
+    matches = match_keywords(
+        "Can I Sleep in My Tent?",
+        "Nana makes breakfast for Harry.",
+        rules,
+    )
+    proposal = propose_tagged_episode(parse_filename("Harry_S01E25.mp4"), matches)
+
+    assert proposal.episode.daypart is Daypart.NIGHT
+    assert all(match.tag != "MORNING" for match in proposal.applied_matches)
+
+
 def test_ice_does_not_match_inside_nice() -> None:
     matches = match_keywords("A Nice Day", "", STARTING_RULES)
 
@@ -77,7 +101,7 @@ def test_packaged_rules_cover_starting_examples_and_extra_seasons() -> None:
     rules = parse_keyword_rules(RULES_PATH.read_text(encoding="utf-8"))
     tags_by_keyword_sample = {
         match_keywords("snow", "", rules)[0].tag,
-        match_keywords("moon", "", rules)[0].tag,
+        match_keywords("night", "", rules)[0].tag,
         match_keywords("breakfast", "", rules)[0].tag,
         match_keywords("pumpkin", "", rules)[0].tag,
         match_keywords("spring bloom", "", rules)[0].tag,
@@ -141,6 +165,112 @@ def test_packaged_rules_cover_starting_examples_and_extra_seasons() -> None:
         ("A Day at the Beach", "", SeasonTag.SUMMER, Daypart.GENERAL, None),
         ("What's for Breakfast?", "", None, Daypart.MORNING, None),
         ("I See a Seashell!", "", SeasonTag.SUMMER, Daypart.GENERAL, None),
+        (
+            "I Don't Wanna Go to Bed",
+            "",
+            None,
+            Daypart.NIGHT,
+            None,
+        ),
+        (
+            "Aaagh!",
+            "Harry has a nightmare about a monster.",
+            None,
+            Daypart.NIGHT,
+            None,
+        ),
+        (
+            "Can I Sleep in My Tent?",
+            "They follow the wreckage left in its wake after breakfast.",
+            None,
+            Daypart.NIGHT,
+            None,
+        ),
+        ("Sleepover", "the next morning a banana grows", None, Daypart.NIGHT, None),
+        (
+            "I'm Really Hot!",
+            "they marvel at the lovely winter weather and a snowstorm",
+            SeasonTag.SUMMER,
+            Daypart.GENERAL,
+            None,
+        ),
+        (
+            "Abracadabra!",
+            "Harry receives a box of magic tricks for Christmas.",
+            None,
+            Daypart.GENERAL,
+            None,
+        ),
+        (
+            "The Postman's Here!",
+            "A letter addressed to a Mr. Snow is delivered to Harry.",
+            None,
+            Daypart.GENERAL,
+            None,
+        ),
+        (
+            "Somebody's Moving",
+            "It is snowing. They help Mr. Snow move to a new igloo.",
+            SeasonTag.WINTER,
+            Daypart.GENERAL,
+            None,
+        ),
+        (
+            "It's Made of Cheese!",
+            "They take a rocket to the moon to see if it is cheese.",
+            None,
+            Daypart.GENERAL,
+            None,
+        ),
+        (
+            "Blast Off / Space Captain Harry",
+            "Groups of stars make pictures called constellations.",
+            None,
+            Daypart.GENERAL,
+            None,
+        ),
+        (
+            "The Bleepers",
+            "Kipper helps the Bleepers return home to the moon.",
+            None,
+            Daypart.GENERAL,
+            None,
+        ),
+        (
+            "Odd One Out / Goodbye Best Friend",
+            "Henry decides to move back to the Frozen North.",
+            None,
+            Daypart.GENERAL,
+            None,
+        ),
+        (
+            "Weenie Needs a Bath / Hide and Seek",
+            "Weenie hitches a ride in Johnny's ice cream truck.",
+            None,
+            Daypart.GENERAL,
+            None,
+        ),
+        (
+            "The Tomato Garden / Bird Watching",
+            "Oswald eats his last tomato for breakfast.",
+            None,
+            Daypart.GENERAL,
+            None,
+        ),
+        (
+            "Can I Keep It? / I Don't Wanna Go to Bed",
+            "Harry finds a nest with an egg in it.",
+            SeasonTag.SPRING,
+            Daypart.NIGHT,
+            None,
+        ),
+        (
+            "Job for a Day",
+            "Oswald and Weenie make a special ice cream delivery.",
+            SeasonTag.SUMMER,
+            Daypart.GENERAL,
+            None,
+        ),
     ],
 )
 def test_packaged_rules_tag_library_titles_accurately(
@@ -274,6 +404,18 @@ def test_parse_keyword_rules_rejects_hyphenated_keyword() -> None:
 def test_parse_keyword_rules_rejects_tab_in_keyword() -> None:
     with pytest.raises(InvalidKeywordRulesError, match="alphanumeric"):
         parse_keyword_rules('[[rule]]\ntag = "SUMMER"\nkeywords = ["ice\\tcream"]\n')
+
+
+def test_title_ice_cream_truck_still_tags_summer() -> None:
+    rules = parse_keyword_rules(RULES_PATH.read_text(encoding="utf-8"))
+    matches = match_keywords(
+        "Chasing the Ice-Cream Truck",
+        "Oswald and Weenie chase after Johnny's ice cream truck.",
+        rules,
+    )
+    proposal = propose_tagged_episode(parse_filename("Oswald_S01E01.mp4"), matches)
+
+    assert proposal.episode.season_tag is SeasonTag.SUMMER
 
 
 @pytest.mark.parametrize("title", ["ICE-Cream", "Ice Cream"])

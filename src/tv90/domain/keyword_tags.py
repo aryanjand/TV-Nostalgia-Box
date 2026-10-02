@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import tomllib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
 from tv90.domain.episode import (
@@ -34,6 +34,9 @@ KEYWORD_WORD_SEPARATOR = " "
 RULES_TABLE_KEY = "rule"
 RULE_TAG_KEY = "tag"
 RULE_KEYWORDS_KEY = "keywords"
+RULE_TITLE_KEYWORDS_KEY = "title_keywords"
+RULE_PLOT_KEYWORDS_KEY = "plot_keywords"
+RULE_EXCLUDE_PHRASES_KEY = "exclude_phrases"
 
 DAYPART_FROM_RULE_TAG = {
     DAYPART_TAG_MORNING: Daypart.MORNING,
@@ -70,6 +73,19 @@ class InvalidKeywordRulesError(Exception):
 class KeywordTagRule:
     tag: str
     keywords: tuple[str, ...]
+    title_keywords: tuple[str, ...] = ()
+    plot_keywords: tuple[str, ...] = ()
+    exclude_phrases: tuple[str, ...] = ()
+
+    def terms_for_title(self) -> tuple[str, ...]:
+        if self.title_keywords:
+            return self.title_keywords
+        return self.keywords
+
+    def terms_for_plot(self) -> tuple[str, ...]:
+        if self.title_keywords or self.plot_keywords:
+            return self.plot_keywords
+        return self.keywords
 
 
 @dataclass(frozen=True)
@@ -106,18 +122,89 @@ def parse_keyword_rules(toml_text: str) -> tuple[KeywordTagRule, ...]:
 def match_keywords(
     title: str, description: str, rules: Sequence[KeywordTagRule]
 ) -> tuple[KeywordMatch, ...]:
-    tokens = WORD_PATTERN.findall(f"{title} {description}".lower())
+    combined_tokens = WORD_PATTERN.findall(f"{title} {description}".lower())
+    title_matches = _matches_in_text(title, rules, for_title=True)
+    plot_matches = _matches_in_text(
+        description,
+        rules,
+        for_title=False,
+        suppressed=_suppressed_plot_keywords(rules, combined_tokens),
+    )
+    return _prefer_title_kind_matches(title_matches, plot_matches)
+
+
+def _matches_in_text(
+    text: str,
+    rules: Sequence[KeywordTagRule],
+    *,
+    for_title: bool,
+    suppressed: Mapping[str, frozenset[str]] | None = None,
+) -> tuple[KeywordMatch, ...]:
+    tokens = WORD_PATTERN.findall(text.lower())
     token_set = frozenset(tokens)
+    blocked_by_tag = suppressed or {}
     matches: list[KeywordMatch] = []
     for rule in rules:
+        blocked = blocked_by_tag.get(rule.tag, frozenset())
+        terms = rule.terms_for_title() if for_title else rule.terms_for_plot()
         triggered = tuple(
             keyword
-            for keyword in rule.keywords
-            if _keyword_is_triggered(keyword, tokens, token_set)
+            for keyword in terms
+            if keyword not in blocked
+            and _keyword_is_triggered(keyword, tokens, token_set)
         )
         if triggered:
             matches.append(KeywordMatch(tag=rule.tag, keywords=triggered))
     return tuple(matches)
+
+
+def _suppressed_plot_keywords(
+    rules: Sequence[KeywordTagRule], tokens: Sequence[str]
+) -> dict[str, frozenset[str]]:
+    suppressed: dict[str, frozenset[str]] = {}
+    for rule in rules:
+        blocked: set[str] = set()
+        for phrase in rule.exclude_phrases:
+            phrase_tokens = _keyword_tokens(phrase)
+            if not _consecutive_tokens_match(phrase_tokens, tokens):
+                continue
+            for keyword in rule.terms_for_plot():
+                if _consecutive_tokens_match(_keyword_tokens(keyword), phrase_tokens):
+                    blocked.add(keyword)
+        if blocked:
+            suppressed[rule.tag] = frozenset(blocked)
+    return suppressed
+
+
+def _match_kind(tag: str) -> str:
+    if tag in DAYPART_FROM_RULE_TAG:
+        return "daypart"
+    if tag in SEASON_FROM_RULE_TAG:
+        return "season"
+    if tag in HOLIDAY_FROM_RULE_TAG:
+        return "holiday"
+    return tag
+
+
+def _prefer_title_kind_matches(
+    title_matches: Sequence[KeywordMatch],
+    description_matches: Sequence[KeywordMatch],
+) -> tuple[KeywordMatch, ...]:
+    title_kinds = {_match_kind(match.tag) for match in title_matches}
+    description_by_tag = {match.tag: match for match in description_matches}
+    merged: list[KeywordMatch] = []
+    for match in title_matches:
+        extra = description_by_tag.get(match.tag)
+        if extra is None:
+            merged.append(match)
+            continue
+        keywords = tuple(dict.fromkeys((*match.keywords, *extra.keywords)))
+        merged.append(KeywordMatch(tag=match.tag, keywords=keywords))
+    for match in description_matches:
+        if _match_kind(match.tag) in title_kinds:
+            continue
+        merged.append(match)
+    return tuple(merged)
 
 
 def propose_tagged_episode(
@@ -161,8 +248,25 @@ def _parse_one_rule(raw_rule: object, seen_tags: set[str]) -> KeywordTagRule:
     if not isinstance(raw_rule, dict):
         raise InvalidKeywordRulesError("each [[rule]] must be a table")
     tag = _require_tag(raw_rule.get(RULE_TAG_KEY), seen_tags)
-    keywords = _require_keywords(raw_rule.get(RULE_KEYWORDS_KEY), tag)
-    return KeywordTagRule(tag=tag, keywords=keywords)
+    shared = _optional_phrases(raw_rule, RULE_KEYWORDS_KEY, tag)
+    title_keywords = _optional_phrases(raw_rule, RULE_TITLE_KEYWORDS_KEY, tag)
+    plot_keywords = _optional_phrases(raw_rule, RULE_PLOT_KEYWORDS_KEY, tag)
+    exclude_phrases = _optional_phrases(raw_rule, RULE_EXCLUDE_PHRASES_KEY, tag) or ()
+    if title_keywords is None and plot_keywords is None:
+        if not shared:
+            raise InvalidKeywordRulesError(f"{tag} must list at least one keyword")
+        return KeywordTagRule(tag=tag, keywords=shared, exclude_phrases=exclude_phrases)
+    resolved_title = title_keywords if title_keywords is not None else shared or ()
+    resolved_plot = plot_keywords if plot_keywords is not None else shared or ()
+    if not resolved_title and not resolved_plot:
+        raise InvalidKeywordRulesError(f"{tag} must list at least one keyword")
+    return KeywordTagRule(
+        tag=tag,
+        keywords=tuple(dict.fromkeys((*resolved_title, *resolved_plot))),
+        title_keywords=resolved_title,
+        plot_keywords=resolved_plot,
+        exclude_phrases=exclude_phrases,
+    )
 
 
 def _require_tag(value: object, seen_tags: set[str]) -> str:
@@ -175,8 +279,24 @@ def _require_tag(value: object, seen_tags: set[str]) -> str:
     return value
 
 
+def _optional_phrases(
+    raw_rule: Mapping[str, object], key: str, tag: str
+) -> tuple[str, ...] | None:
+    if key not in raw_rule:
+        return None
+    return _require_phrases(raw_rule[key], tag, allow_empty=True)
+
+
 def _require_keywords(value: object, tag: str) -> tuple[str, ...]:
-    if not isinstance(value, list) or not value:
+    return _require_phrases(value, tag, allow_empty=False)
+
+
+def _require_phrases(value: object, tag: str, *, allow_empty: bool) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        raise InvalidKeywordRulesError(f"{tag} keywords must be a list of strings")
+    if not value:
+        if allow_empty:
+            return ()
         raise InvalidKeywordRulesError(f"{tag} must list at least one keyword")
     keywords: list[str] = []
     seen: set[str] = set()

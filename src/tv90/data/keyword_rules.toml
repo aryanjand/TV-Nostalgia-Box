@@ -1,21 +1,23 @@
-# Whole-word, case-insensitive keywords → scheduler tags.
-# Edit this file to add household words. Do not add Python if/else for keywords.
-# Dress-up "costume" is not Halloween. "swim" does not match "swimming".
+# Title words are the episode theme. Plot words only add weather/setting.
+# exclude_phrases cancel a plot match (not a title match).
+# Dress-up "costume" is not Halloween. "moon"/"stars" are space, not bedtime.
 
 [[rule]]
 tag = "WINTER"
-keywords = [
+title_keywords = ["snow", "snowy", "sled", "igloo", "freeze", "winter"]
+plot_keywords = [
     "snow",
-    "sled",
-    "ice",
     "snowy",
     "snowing",
-    "winter",
-    "frozen",
-    "blizzard",
+    "sled",
     "igloo",
-    "freeze",
+    "blizzard",
+    "snowstorm",
+    "snowman",
+    "snowball",
+    "winter",
 ]
+exclude_phrases = ["mr snow", "frozen north"]
 
 [[rule]]
 tag = "SPRING"
@@ -23,7 +25,7 @@ keywords = ["spring", "bloom", "blossom", "tulip", "nest", "hatch"]
 
 [[rule]]
 tag = "SUMMER"
-keywords = [
+title_keywords = [
     "summer",
     "beach",
     "seaside",
@@ -33,32 +35,77 @@ keywords = [
     "picnic",
     "ice cream",
     "seashell",
+    "sunny",
+    "sandcastle",
+    "sweltering",
+    "really hot",
 ]
+plot_keywords = [
+    "summer",
+    "beach",
+    "seaside",
+    "swim",
+    "swimming",
+    "paddling pool",
+    "picnic",
+    "ice cream",
+    "seashell",
+    "sunny",
+    "sandcastle",
+    "sweltering",
+]
+exclude_phrases = ["ice cream truck"]
 
 [[rule]]
 tag = "AUTUMN"
-keywords = ["autumn", "harvest", "foliage", "acorn", "conker"]
+keywords = ["autumn", "harvest", "foliage", "acorn", "acorns", "conker"]
 
 [[rule]]
 tag = "MORNING"
-keywords = ["breakfast", "wake", "sunrise", "morning"]
+title_keywords = ["breakfast", "sunrise", "morning"]
+plot_keywords = []
 
 [[rule]]
 tag = "NIGHT"
-keywords = ["moon", "bedtime", "sleep", "stars", "pajamas", "night", "goodnight"]
+title_keywords = [
+    "night",
+    "bedtime",
+    "sleep",
+    "pajamas",
+    "goodnight",
+    "nightmare",
+    "go to bed",
+    "sleepover",
+    "sleepless",
+]
+plot_keywords = [
+    "night",
+    "bedtime",
+    "pajamas",
+    "goodnight",
+    "nightmare",
+    "go to bed",
+    "go to sleep",
+    "asleep",
+    "sleepover",
+]
 
 [[rule]]
 tag = "HALLOWEEN"
-keywords = ["pumpkin", "halloween"]
+title_keywords = ["halloween", "pumpkin"]
+plot_keywords = ["halloween", "pumpkin"]
 
 [[rule]]
 tag = "THANKSGIVING"
-keywords = ["thanksgiving", "turkey", "pilgrim"]
+title_keywords = ["thanksgiving", "turkey", "pilgrim"]
+plot_keywords = ["thanksgiving"]
 
 [[rule]]
 tag = "CHRISTMAS"
-keywords = ["christmas", "santa", "reindeer", "stocking"]
+title_keywords = ["christmas", "santa", "reindeer", "stocking"]
+plot_keywords = []
 
 [[rule]]
 tag = "EASTER"
-keywords = ["easter", "bunny"]
+title_keywords = ["easter", "bunny"]
+plot_keywords = ["easter"]

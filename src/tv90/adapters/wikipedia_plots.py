@@ -1,9 +1,10 @@
-"""Wikipedia episode ShortSummary text. Tests inject HTTP; missing plots stay empty."""
+"""Episode ShortSummary text. Packaged JSON is the source; HTTP is optional."""
 
 from __future__ import annotations
 
 import json
 import re
+from importlib import resources
 from urllib.parse import quote
 
 from tv90.config import HARRY_SHOW_STEM, KIPPER_SHOW_STEM, OSWALD_SHOW_STEM
@@ -28,11 +29,14 @@ WIKI_LINK = re.compile(r"\[\[(?:[^|\]]+\|)?([^\]]+)\]\]")
 WIKI_REF = re.compile(r"<ref\b[^>]*>.*?</ref>", re.IGNORECASE | re.DOTALL)
 WIKI_BOLD = re.compile(r"'{2,}")
 WIKI_TAG = re.compile(r"<[^>]+>")
+NOTE_CUT = re.compile(r"\bNote:.*", re.IGNORECASE | re.DOTALL)
 TITLE_SPLIT = " / "
 WORD_PATTERN = re.compile(r"[a-z0-9]+")
 TEXT_ENCODING = "utf-8"
 JSON_WIKITEXT_KEY = "wikitext"
 JSON_PARSE_KEY = "parse"
+PLOTS_PACKAGE = "tv90.data"
+PLOTS_FILENAME = "episode_plots.json"
 
 
 def wikipedia_parse_url(page: str) -> str:
@@ -70,10 +74,44 @@ def parse_episode_list_plots(wikitext: str) -> dict[str, str]:
     return plots
 
 
+def load_packaged_episode_plots() -> dict[str, dict[str, str]]:
+    plots_file = resources.files(PLOTS_PACKAGE).joinpath(PLOTS_FILENAME)
+    try:
+        raw = plots_file.read_text(encoding=TEXT_ENCODING)
+    except OSError:
+        return {}
+    try:
+        loaded: object = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(loaded, dict):
+        return {}
+    catalog: dict[str, dict[str, str]] = {}
+    for show_stem, plots in loaded.items():
+        if not isinstance(show_stem, str) or not isinstance(plots, dict):
+            continue
+        cleaned: dict[str, str] = {}
+        for title_key, summary in plots.items():
+            if isinstance(title_key, str) and isinstance(summary, str) and summary:
+                cleaned[title_key] = summary
+        catalog[show_stem] = cleaned
+    return catalog
+
+
 class WikipediaPlotIndex:
-    def __init__(self, http_get: HttpGetter) -> None:
+    def __init__(
+        self,
+        http_get: HttpGetter | None = None,
+        packaged: dict[str, dict[str, str]] | None = None,
+    ) -> None:
         self._http_get = http_get
+        self._packaged = (
+            packaged if packaged is not None else load_packaged_episode_plots()
+        )
         self._by_show: dict[str, dict[str, str]] = {}
+
+    def packaged_plot_count(self) -> int:
+        return sum(len(plots) for plots in self._packaged.values())
 
     def description_for_title(self, show_stem: str, title: str) -> str:
         catalog = self._catalog_for(show_stem)
@@ -90,18 +128,25 @@ class WikipediaPlotIndex:
     def _catalog_for(self, show_stem: str) -> dict[str, str]:
         if show_stem in self._by_show:
             return self._by_show[show_stem]
+        catalog = dict(self._packaged.get(show_stem, {}))
+        live = self._fetch_live_plots(show_stem)
+        if live:
+            catalog.update(live)
+        self._by_show[show_stem] = catalog
+        return self._by_show[show_stem]
+
+    def _fetch_live_plots(self, show_stem: str) -> dict[str, str]:
+        if self._http_get is None:
+            return {}
         page = WIKIPEDIA_PLOT_PAGES.get(show_stem)
         if page is None:
-            self._by_show[show_stem] = {}
-            return self._by_show[show_stem]
+            return {}
         try:
             body = self._http_get(wikipedia_parse_url(page), wikipedia_headers())
             wikitext = _wikitext_from_parse_body(body)
         except (OSError, TimeoutError, ValueError, TypeError, json.JSONDecodeError):
-            self._by_show[show_stem] = {}
-            return self._by_show[show_stem]
-        self._by_show[show_stem] = parse_episode_list_plots(wikitext)
-        return self._by_show[show_stem]
+            return {}
+        return parse_episode_list_plots(wikitext)
 
 
 def _wikitext_from_parse_body(body: str) -> str:
@@ -198,7 +243,8 @@ def _summaries_from_field(raw_summary: str) -> tuple[str, ...]:
 
 
 def _plain_wiki_text(raw: str) -> str:
-    text = WIKI_REF.sub("", raw)
+    text = NOTE_CUT.sub("", raw)
+    text = WIKI_REF.sub("", text)
     text = WIKI_LINK.sub(r"\1", text)
     text = WIKI_BOLD.sub("", text)
     text = WIKI_TAG.sub(" ", text)
