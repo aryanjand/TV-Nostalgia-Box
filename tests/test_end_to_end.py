@@ -80,6 +80,7 @@ REMOTE_BUTTONS = (
 )
 ALLOWED_REMOTE_ACTIONS = {
     ("/", "GET"),
+    ("/status", "GET"),
     ("/channel/up", "POST"),
     ("/channel/down", "POST"),
     ("/volume/up", "POST"),
@@ -635,8 +636,14 @@ def test_e2e_web_remote_has_only_four_buttons_and_now_playing(tmp_path: Path) ->
     for label in REMOTE_BUTTONS:
         assert label in html
     assert html.lower().count("<form") == 4
-    assert "<script" not in html.lower()
-    assert "<video" not in html.lower()
+    lowered = html.lower()
+    assert lowered.count("<script") <= 1
+    assert "<script src" not in lowered
+    assert "<video" not in lowered
+    assert "<img" not in lowered
+    assert "<select" not in lowered
+    assert "cdn" not in lowered
+    assert "/api/episodes" not in html
 
     actions = {
         (rule.rule, method)

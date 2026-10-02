@@ -35,7 +35,7 @@ from tv90.domain.filename import parse_filename
 from tv90.domain.holiday_calendar import HolidayCalendar
 from tv90.domain.timeline import SECONDS_PER_HOUR
 from tv90.interface.remote import create_remote_app
-from tv90.ports.player import format_channel_banner
+from tv90.ports.player import VOLUME_BAR_SEGMENT_COUNT, format_channel_banner
 
 VANCOUVER = ZoneInfo("America/Vancouver")
 JULY_MORNING = datetime(2024, 7, 15, 7, 0, tzinfo=VANCOUVER)
@@ -69,11 +69,13 @@ ABSENT_MENU_PATHS = (
 )
 ALLOWED_ACTIONS = {
     ("/", "GET"),
+    ("/status", "GET"),
     ("/channel/up", "POST"),
     ("/channel/down", "POST"),
     ("/volume/up", "POST"),
     ("/volume/down", "POST"),
 }
+JSON_ACCEPT = {"Accept": "application/json"}
 PASSIVE_HTTP_METHODS = frozenset({"HEAD", "OPTIONS"})
 
 
@@ -181,6 +183,40 @@ def test_channel_up_post_tunes_and_redirects_to_updated_page(tmp_path: Path) -> 
     assert OSWALD_ONE.filename in page
 
 
+def test_channel_up_json_post_tunes_and_returns_status(tmp_path: Path) -> None:
+    controller, _, player, client = _playing_client(tmp_path)
+
+    response = client.post("/channel/up", headers=JSON_ACCEPT)
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.is_json
+    payload = response.get_json()
+    assert isinstance(payload, dict)
+    assert payload["now_playing"] == controller.now_playing()
+    assert payload["channel_banner"] == format_channel_banner(OSWALD_CHANNEL_NUMBER)
+    assert payload["volume_segments"] == list(controller.volume_segments())
+    assert len(payload["volume_segments"]) == VOLUME_BAR_SEGMENT_COUNT
+    assert _tune_filenames(player)[-1] == OSWALD_ONE.filename
+
+
+def test_status_get_returns_json_shape(tmp_path: Path) -> None:
+    controller, _, _, client = _playing_client(tmp_path)
+
+    response = client.get("/status")
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.is_json
+    payload = response.get_json()
+    assert isinstance(payload, dict)
+    assert set(payload) == {"now_playing", "channel_banner", "volume_segments"}
+    assert payload["now_playing"] == controller.now_playing()
+    assert payload["channel_banner"] == format_channel_banner(
+        LITTLE_BEAR_CHANNEL_NUMBER
+    )
+    assert payload["volume_segments"] == list(controller.volume_segments())
+    assert len(payload["volume_segments"]) == VOLUME_BAR_SEGMENT_COUNT
+
+
 def test_channel_down_post_wraps_to_harry(tmp_path: Path) -> None:
     controller, _, player, client = _playing_client(tmp_path)
 
@@ -232,7 +268,9 @@ def test_untrusted_wait_posts_still_call_controller_which_ignores(
     assert NOW_PLAYING_CLOCK_NOT_SYNCED in _page_text(client)
 
 
-def test_remote_exposes_only_home_and_four_command_posts(tmp_path: Path) -> None:
+def test_remote_exposes_only_home_status_and_four_command_posts(
+    tmp_path: Path,
+) -> None:
     app = create_remote_app(_controller(tmp_path)[0])
 
     actions = {
@@ -279,7 +317,9 @@ def test_page_is_not_an_episode_menu(tmp_path: Path) -> None:
     assert "<select" not in lowered
     assert "<video" not in lowered
     assert "<img" not in lowered
-    assert "<script" not in lowered
+    assert lowered.count("<script") <= 1
+    assert "<script src" not in lowered
     assert "cdn" not in lowered
+    assert "/api/episodes" not in html
     assert "up next" not in lowered
     assert "search" not in lowered

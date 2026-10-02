@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from http import HTTPStatus
+from typing import TypedDict
 
-from flask import Flask, redirect, render_template_string
+from flask import Flask, jsonify, redirect, render_template_string, request
 from werkzeug.wrappers.response import Response
 
 from tv90.application.television import TelevisionController
@@ -18,8 +19,17 @@ CHANNEL_UP_PATH = "/channel/up"
 CHANNEL_DOWN_PATH = "/channel/down"
 VOLUME_UP_PATH = "/volume/up"
 VOLUME_DOWN_PATH = "/volume/down"
+STATUS_PATH = "/status"
+JSON_MIME_TYPE = "application/json"
 NOW_PLAYING_CHANNEL_PREFIX = "CH"
 CHANNEL_BANNER_TOKEN_COUNT = 2
+
+
+class RemoteStatus(TypedDict):
+    now_playing: str
+    channel_banner: str
+    volume_segments: list[bool]
+
 
 # Inline CSS only: the page must work with no network and no extra files.
 _REMOTE_PAGE = """<!DOCTYPE html>
@@ -157,6 +167,55 @@ _REMOTE_PAGE = """<!DOCTYPE html>
       </form>
     </div>
   </main>
+  <script>
+    (function () {
+      function applyStatus(data) {
+        var playing = document.querySelector(".now-playing");
+        if (playing) playing.textContent = data.now_playing;
+        var main = document.querySelector("main");
+        var bug = document.querySelector(".channel-bug");
+        var banner = data.channel_banner;
+        if (banner) {
+          if (!bug && main) {
+            bug = document.createElement("p");
+            bug.className = "channel-bug";
+            main.insertBefore(bug, main.firstChild);
+          }
+          if (bug) bug.textContent = banner;
+        } else if (bug) {
+          bug.remove();
+        }
+        var segs = document.querySelectorAll(".volume-track .seg");
+        var filled = data.volume_segments;
+        for (var i = 0; i < segs.length; i += 1) {
+          var on = Boolean(filled[i]);
+          segs[i].classList.toggle("on", on);
+          segs[i].classList.toggle("off", !on);
+        }
+      }
+      document.querySelectorAll("form").forEach(function (form) {
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          fetch(form.action, {
+            method: "POST",
+            headers: { Accept: "application/json" },
+            credentials: "same-origin"
+          }).then(function (response) {
+            return response.json();
+          }).then(applyStatus);
+        });
+      });
+      setInterval(function () {
+        if (document.visibilityState !== "visible") return;
+        fetch("/status", {
+          headers: { Accept: "application/json" },
+          credentials: "same-origin"
+        }).then(function (response) {
+          return response.json();
+        }).then(applyStatus);
+      }, 2000);
+    })();
+  </script>
 </body>
 </html>
 """
@@ -177,27 +236,54 @@ def create_remote_app(controller: TelevisionController) -> Flask:
             volume_segments=controller.volume_segments(),
         )
 
+    @app.get(STATUS_PATH)
+    def status() -> Response:
+        return _status_response(controller)
+
     @app.post(CHANNEL_UP_PATH)
     def channel_up() -> Response:
         controller.channel_up()
-        return _redirect_home()
+        return _command_response(controller)
 
     @app.post(CHANNEL_DOWN_PATH)
     def channel_down() -> Response:
         controller.channel_down()
-        return _redirect_home()
+        return _command_response(controller)
 
     @app.post(VOLUME_UP_PATH)
     def volume_up() -> Response:
         controller.volume_up()
-        return _redirect_home()
+        return _command_response(controller)
 
     @app.post(VOLUME_DOWN_PATH)
     def volume_down() -> Response:
         controller.volume_down()
-        return _redirect_home()
+        return _command_response(controller)
 
     return app
+
+
+def _command_response(controller: TelevisionController) -> Response:
+    if _wants_json():
+        return _status_response(controller)
+    return _redirect_home()
+
+
+def _status_response(controller: TelevisionController) -> Response:
+    return jsonify(_remote_status(controller))
+
+
+def _remote_status(controller: TelevisionController) -> RemoteStatus:
+    now_playing = controller.now_playing()
+    return {
+        "now_playing": now_playing,
+        "channel_banner": _channel_banner_from_now_playing(now_playing),
+        "volume_segments": list(controller.volume_segments()),
+    }
+
+
+def _wants_json() -> bool:
+    return request.accept_mimetypes.best == JSON_MIME_TYPE
 
 
 def _redirect_home() -> Response:
