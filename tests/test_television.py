@@ -49,7 +49,7 @@ from tv90.domain.holiday_calendar import HolidayCalendar
 from tv90.domain.timeline import SECONDS_PER_HOUR, Timeline
 from tv90.ports.duration import DurationIndex
 from tv90.ports.library import LibrarySource
-from tv90.ports.player import format_channel_banner
+from tv90.ports.player import VOLUME_BAR_SEGMENT_COUNT, format_channel_banner
 
 VANCOUVER = ZoneInfo("America/Vancouver")
 JULY_MORNING = datetime(2024, 7, 15, 7, 0, tzinfo=VANCOUVER)
@@ -395,8 +395,12 @@ def test_volume_never_exceeds_ceiling_and_shows_bar(tmp_path: Path) -> None:
         controller.volume_up()
 
     assert player.volume == pytest.approx(VOLUME_CEILING)
+    assert controller.volume() == pytest.approx(VOLUME_CEILING)
     assert player.volume <= VOLUME_CEILING
     assert any(isinstance(command, ShowVolumeBarCommand) for command in player.commands)
+    assert controller.volume_segments().count(True) == round(
+        VOLUME_CEILING * VOLUME_BAR_SEGMENT_COUNT
+    )
 
 
 def test_volume_down_clamps_to_zero(tmp_path: Path) -> None:

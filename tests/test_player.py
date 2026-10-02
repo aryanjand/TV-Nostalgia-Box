@@ -19,6 +19,7 @@ from tv90.adapters.fake_player import (
     TunerChangeCommand,
 )
 from tv90.adapters.mpv_ipc_player import (
+    CHANNEL_OSD_FONT_SIZE,
     MILLISECONDS_PER_SECOND,
     MPV_PERCENT_VOLUME_SCALE,
     OSD_FONT_NAME,
@@ -60,10 +61,10 @@ def test_format_channel_banner_zero_pads_two_digits() -> None:
     assert format_channel_banner(1) == "CH 01"
 
 
-def test_format_volume_bar_uses_ten_segments() -> None:
-    assert format_volume_bar(0.4) == "████░░░░░░"
-    assert format_volume_bar(0.0) == "░░░░░░░░░░"
-    assert format_volume_bar(1.0) == "██████████"
+def test_format_volume_bar_uses_twenty_classic_segments() -> None:
+    assert format_volume_bar(0.4) == "Volume\n█ █ █ █ █ █ █ █ · · · · · · · · · · · ·"
+    assert format_volume_bar(0.0) == "Volume\n· · · · · · · · · · · · · · · · · · · ·"
+    assert format_volume_bar(1.0) == "Volume\n█ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █"
 
 
 def test_fake_player_load_seeks_to_offset_and_records_command() -> None:
@@ -149,7 +150,12 @@ def test_fake_player_volume_bar_records_segmented_bar() -> None:
 
     player.show_volume_bar(0.4)
 
-    assert player.commands == (ShowVolumeBarCommand(volume=0.4, bar_text="████░░░░░░"),)
+    assert player.commands == (
+        ShowVolumeBarCommand(
+            volume=0.4,
+            bar_text="Volume\n█ █ █ █ █ █ █ █ · · · · · · · · · · · ·",
+        ),
+    )
     assert player.volume == load_settings({}).volume_default
 
 
@@ -390,6 +396,9 @@ def test_mpv_channel_banner_sends_osd_without_sleeping() -> None:
     tokens = [_command_tokens(payload) for payload in sender.payloads]
     assert ["set_property", "osd-color", "#00FF00"] in tokens
     assert ["set_property", "osd-font", OSD_FONT_NAME] in tokens
+    assert ["set_property", "osd-align-x", "right"] in tokens
+    assert ["set_property", "osd-align-y", "top"] in tokens
+    assert ["set_property", "osd-font-size", CHANNEL_OSD_FONT_SIZE] in tokens
     assert ["show-text", "CH 03", 2500] in tokens
 
 
@@ -399,7 +408,13 @@ def test_mpv_volume_bar_sends_segmented_osd() -> None:
     player.show_volume_bar(0.4)
 
     tokens = [_command_tokens(payload) for payload in sender.payloads]
-    assert ["show-text", "████░░░░░░", 3000] in tokens
+    assert ["set_property", "osd-align-x", "left"] in tokens
+    assert ["set_property", "osd-align-y", "bottom"] in tokens
+    assert [
+        "show-text",
+        "Volume\n█ █ █ █ █ █ █ █ · · · · · · · · · · · ·",
+        3000,
+    ] in tokens
 
 
 def test_mpv_fade_and_tune_send_different_commands() -> None:

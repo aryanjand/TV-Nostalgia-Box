@@ -9,9 +9,11 @@ MINIMUM_PLAYER_VOLUME = 0.0
 MAXIMUM_PLAYER_VOLUME = 1.0
 CHANNEL_BANNER_PREFIX = "CH"
 CHANNEL_BANNER_NUMBER_WIDTH = 2
-VOLUME_BAR_SEGMENT_COUNT = 10
+VOLUME_BAR_SEGMENT_COUNT = 20
 VOLUME_BAR_FILLED_SEGMENT = "█"
-VOLUME_BAR_EMPTY_SEGMENT = "░"
+VOLUME_BAR_EMPTY_SEGMENT = "·"
+VOLUME_BAR_SEGMENT_SEPARATOR = " "
+VOLUME_BAR_LABEL = "Volume"
 
 
 class InvalidVolumeError(ValueError):
@@ -75,14 +77,24 @@ def format_channel_banner(channel_number: int) -> str:
     return f"{CHANNEL_BANNER_PREFIX} {padded_number}"
 
 
-def format_volume_bar(volume: float) -> str:
+def volume_bar_filled_count(volume: float) -> int:
     require_player_volume(volume)
-    filled_count = min(
+    return min(
         VOLUME_BAR_SEGMENT_COUNT,
         max(0, round(volume * VOLUME_BAR_SEGMENT_COUNT)),
     )
+
+
+def volume_bar_segments(volume: float) -> tuple[bool, ...]:
+    filled_count = volume_bar_filled_count(volume)
+    return tuple(index < filled_count for index in range(VOLUME_BAR_SEGMENT_COUNT))
+
+
+def format_volume_bar(volume: float) -> str:
+    filled_count = volume_bar_filled_count(volume)
     empty_count = VOLUME_BAR_SEGMENT_COUNT - filled_count
-    return (
-        VOLUME_BAR_FILLED_SEGMENT * filled_count
-        + VOLUME_BAR_EMPTY_SEGMENT * empty_count
+    bar = VOLUME_BAR_SEGMENT_SEPARATOR.join(
+        ([VOLUME_BAR_FILLED_SEGMENT] * filled_count)
+        + ([VOLUME_BAR_EMPTY_SEGMENT] * empty_count)
     )
+    return f"{VOLUME_BAR_LABEL}\n{bar}"

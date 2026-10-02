@@ -137,6 +137,9 @@ def test_home_page_has_four_buttons_and_now_playing(tmp_path: Path) -> None:
     assert "Now Playing" in html
     assert controller.now_playing() in html
     assert format_channel_banner(LITTLE_BEAR_CHANNEL_NUMBER) in html
+    assert 'class="channel-bug"' in html
+    assert "Volume" in html
+    assert 'class="volume-track"' in html
     assert any(
         episode.filename in html for episode in (LITTLE_BEAR_ONE, LITTLE_BEAR_TWO)
     )

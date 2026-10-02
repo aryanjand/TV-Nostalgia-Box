@@ -57,6 +57,20 @@ OBSERVE_PROPERTY_COMMAND = "observe_property"
 VOLUME_PROPERTY = "volume"
 OSD_COLOR_PROPERTY = "osd-color"
 OSD_FONT_PROPERTY = "osd-font"
+OSD_ALIGN_X_PROPERTY = "osd-align-x"
+OSD_ALIGN_Y_PROPERTY = "osd-align-y"
+OSD_FONT_SIZE_PROPERTY = "osd-font-size"
+OSD_BOLD_PROPERTY = "osd-bold"
+OSD_MARGIN_X_PROPERTY = "osd-margin-x"
+OSD_MARGIN_Y_PROPERTY = "osd-margin-y"
+CHANNEL_OSD_ALIGN_X = "right"
+CHANNEL_OSD_ALIGN_Y = "top"
+CHANNEL_OSD_FONT_SIZE = 80
+VOLUME_OSD_ALIGN_X = "left"
+VOLUME_OSD_ALIGN_Y = "bottom"
+VOLUME_OSD_FONT_SIZE = 40
+OSD_MARGIN_PIXELS = 40
+OSD_BOLD_ON = "yes"
 
 SLATE_OVERLAY_ID = 1
 TUNER_OVERLAY_ID = 2
@@ -235,8 +249,9 @@ class MpvIpcPlayer:
 
     def show_channel_banner(self, channel_number: int) -> None:
         # osd-duration is on the show-text command; this method must not sleep.
-        self._send([SET_PROPERTY_COMMAND, OSD_COLOR_PROPERTY, self._settings.osd_color])
-        self._send([SET_PROPERTY_COMMAND, OSD_FONT_PROPERTY, OSD_FONT_NAME])
+        self._prepare_osd(
+            CHANNEL_OSD_ALIGN_X, CHANNEL_OSD_ALIGN_Y, CHANNEL_OSD_FONT_SIZE
+        )
         self._send(
             [
                 SHOW_TEXT_COMMAND,
@@ -247,7 +262,7 @@ class MpvIpcPlayer:
 
     def show_volume_bar(self, volume: float) -> None:
         require_player_volume(volume)
-        self._send([SET_PROPERTY_COMMAND, OSD_COLOR_PROPERTY, self._settings.osd_color])
+        self._prepare_osd(VOLUME_OSD_ALIGN_X, VOLUME_OSD_ALIGN_Y, VOLUME_OSD_FONT_SIZE)
         self._send(
             [
                 SHOW_TEXT_COMMAND,
@@ -288,6 +303,16 @@ class MpvIpcPlayer:
                 return
             if _event_reports_playback_ended(event):
                 self._playback_ended = True
+
+    def _prepare_osd(self, align_x: str, align_y: str, font_size: int) -> None:
+        self._send([SET_PROPERTY_COMMAND, OSD_COLOR_PROPERTY, self._settings.osd_color])
+        self._send([SET_PROPERTY_COMMAND, OSD_FONT_PROPERTY, OSD_FONT_NAME])
+        self._send([SET_PROPERTY_COMMAND, OSD_BOLD_PROPERTY, OSD_BOLD_ON])
+        self._send([SET_PROPERTY_COMMAND, OSD_ALIGN_X_PROPERTY, align_x])
+        self._send([SET_PROPERTY_COMMAND, OSD_ALIGN_Y_PROPERTY, align_y])
+        self._send([SET_PROPERTY_COMMAND, OSD_FONT_SIZE_PROPERTY, font_size])
+        self._send([SET_PROPERTY_COMMAND, OSD_MARGIN_X_PROPERTY, OSD_MARGIN_PIXELS])
+        self._send([SET_PROPERTY_COMMAND, OSD_MARGIN_Y_PROPERTY, OSD_MARGIN_PIXELS])
 
     def _send_loadfile(
         self,

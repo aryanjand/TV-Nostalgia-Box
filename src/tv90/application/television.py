@@ -24,7 +24,12 @@ from tv90.domain.timeline import SECONDS_PER_HOUR, Slot, Timeline
 from tv90.ports.clock import Clock
 from tv90.ports.duration import DurationIndex
 from tv90.ports.library import LibrarySource
-from tv90.ports.player import MINIMUM_PLAYER_VOLUME, Player, format_channel_banner
+from tv90.ports.player import (
+    MINIMUM_PLAYER_VOLUME,
+    Player,
+    format_channel_banner,
+    volume_bar_segments,
+)
 from tv90.ports.tv_power import TvPower
 
 # Remote volume step. Ceiling still comes from Settings; this is only the button size.
@@ -122,6 +127,12 @@ class TelevisionController:
         if self._awaiting_trust_retune:
             return f"{line}{NOW_PLAYING_FIELD_SEPARATOR}{NOW_PLAYING_CLOCK_NOT_SYNCED}"
         return line
+
+    def volume(self) -> float:
+        return self._volume
+
+    def volume_segments(self) -> tuple[bool, ...]:
+        return volume_bar_segments(self._volume)
 
     def channel_up(self) -> None:
         if not self._accepts_remote_commands():
