@@ -11,7 +11,7 @@ keywords = ["spring", "bloom", "blossom", "tulip", "nest", "hatch"]
 
 [[rule]]
 tag = "SUMMER"
-keywords = ["summer", "beach", "swim", "picnic"]
+keywords = ["summer", "beach", "swim", "picnic", "ice cream"]
 
 [[rule]]
 tag = "AUTUMN"

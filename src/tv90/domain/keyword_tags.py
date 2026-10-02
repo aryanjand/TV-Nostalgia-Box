@@ -25,10 +25,12 @@ from tv90.domain.episode import (
 )
 from tv90.domain.filename import format_filename
 
-# Whole-word tokens so "ice" cannot match "nice". Extra spellings live in the
-# rules file.
+# Whole-word tokens so "ice" cannot match "nice". Phrase keywords match
+# consecutive tokens. Extra spellings live in the rules file.
 WORD_PATTERN = re.compile(r"[a-z0-9]+")
-KEYWORD_TOKEN_PATTERN = re.compile(r"^[a-z0-9]+$")
+KEYWORD_PHRASE_PATTERN = re.compile(r"^[a-z0-9]+(?: [a-z0-9]+)*$")
+REPEATED_SPACES_PATTERN = re.compile(r" +")
+KEYWORD_WORD_SEPARATOR = " "
 RULES_TABLE_KEY = "rule"
 RULE_TAG_KEY = "tag"
 RULE_KEYWORDS_KEY = "keywords"
@@ -104,10 +106,15 @@ def parse_keyword_rules(toml_text: str) -> tuple[KeywordTagRule, ...]:
 def match_keywords(
     title: str, description: str, rules: Sequence[KeywordTagRule]
 ) -> tuple[KeywordMatch, ...]:
-    words = frozenset(WORD_PATTERN.findall(f"{title} {description}".lower()))
+    tokens = WORD_PATTERN.findall(f"{title} {description}".lower())
+    token_set = frozenset(tokens)
     matches: list[KeywordMatch] = []
     for rule in rules:
-        triggered = tuple(keyword for keyword in rule.keywords if keyword in words)
+        triggered = tuple(
+            keyword
+            for keyword in rule.keywords
+            if _keyword_is_triggered(keyword, tokens, token_set)
+        )
         if triggered:
             matches.append(KeywordMatch(tag=rule.tag, keywords=triggered))
     return tuple(matches)
@@ -120,7 +127,7 @@ def propose_tagged_episode(
     season_tag = episode.season_tag
     holiday_tag = episode.holiday_tag
     applied: list[KeywordMatch] = []
-    for match in matches:
+    for match in _prefer_longest_new_matches(matches):
         if match.tag in DAYPART_FROM_RULE_TAG:
             if daypart is not Daypart.GENERAL:
                 continue
@@ -176,13 +183,56 @@ def _require_keywords(value: object, tag: str) -> tuple[str, ...]:
     for item in value:
         if not isinstance(item, str) or item.strip() == "":
             raise InvalidKeywordRulesError(f"{tag} keywords must be non-empty strings")
-        token = item.strip().lower()
-        if KEYWORD_TOKEN_PATTERN.fullmatch(token) is None:
+        phrase = _normalize_keyword(item)
+        if KEYWORD_PHRASE_PATTERN.fullmatch(phrase) is None:
             raise InvalidKeywordRulesError(
-                f"{tag} keyword {item!r} must be a single alphanumeric word"
+                f"{tag} keyword {item!r} must be alphanumeric words "
+                "separated by single spaces"
             )
-        if token in seen:
+        if phrase in seen:
             continue
-        seen.add(token)
-        keywords.append(token)
+        seen.add(phrase)
+        keywords.append(phrase)
     return tuple(keywords)
+
+
+def _normalize_keyword(item: str) -> str:
+    return REPEATED_SPACES_PATTERN.sub(KEYWORD_WORD_SEPARATOR, item.strip().lower())
+
+
+def _keyword_tokens(keyword: str) -> tuple[str, ...]:
+    return tuple(keyword.split(KEYWORD_WORD_SEPARATOR))
+
+
+def _keyword_is_triggered(
+    keyword: str, tokens: Sequence[str], token_set: frozenset[str]
+) -> bool:
+    phrase = _keyword_tokens(keyword)
+    if len(phrase) == 1:
+        return phrase[0] in token_set
+    return _consecutive_tokens_match(phrase, tokens)
+
+
+def _consecutive_tokens_match(phrase: Sequence[str], tokens: Sequence[str]) -> bool:
+    width = len(phrase)
+    phrase_tokens = tuple(phrase)
+    return any(
+        tuple(tokens[start : start + width]) == phrase_tokens
+        for start in range(len(tokens) - width + 1)
+    )
+
+
+def _prefer_longest_new_matches(
+    matches: Sequence[KeywordMatch],
+) -> tuple[KeywordMatch, ...]:
+    ranked = sorted(enumerate(matches), key=_new_match_rank)
+    return tuple(match for _, match in ranked)
+
+
+def _new_match_rank(indexed: tuple[int, KeywordMatch]) -> tuple[int, int]:
+    index, match = indexed
+    return (-_longest_triggered_token_count(match), index)
+
+
+def _longest_triggered_token_count(match: KeywordMatch) -> int:
+    return max(len(_keyword_tokens(keyword)) for keyword in match.keywords)

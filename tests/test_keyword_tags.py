@@ -80,6 +80,10 @@ def test_packaged_rules_cover_starting_examples_and_extra_seasons() -> None:
         match_keywords("christmas santa", "", rules)[0].tag,
         match_keywords("easter bunny", "", rules)[0].tag,
     }
+    ice_cream = propose_tagged_episode(
+        parse_filename("Oswald_S01E01.mp4"),
+        match_keywords("ICE-Cream", "", rules),
+    )
 
     assert tags_by_keyword_sample == {
         "WINTER",
@@ -93,6 +97,7 @@ def test_packaged_rules_cover_starting_examples_and_extra_seasons() -> None:
         "CHRISTMAS",
         "EASTER",
     }
+    assert ice_cream.episode.season_tag is SeasonTag.SUMMER
 
 
 def test_existing_morning_is_kept_when_night_keywords_match() -> None:
@@ -186,9 +191,55 @@ def test_parse_keyword_rules_rejects_non_string_keyword() -> None:
         parse_keyword_rules('[[rule]]\ntag = "WINTER"\nkeywords = [1]\n')
 
 
-def test_parse_keyword_rules_rejects_multiword_keyword() -> None:
+def test_parse_keyword_rules_allows_phrase_keyword() -> None:
+    rules = parse_keyword_rules('[[rule]]\ntag = "SUMMER"\nkeywords = ["ice cream"]\n')
+
+    assert rules == (KeywordTagRule(tag="SUMMER", keywords=("ice cream",)),)
+
+
+def test_parse_keyword_rules_collapses_repeated_spaces_in_phrase() -> None:
+    rules = parse_keyword_rules('[[rule]]\ntag = "SUMMER"\nkeywords = ["ice  cream"]\n')
+
+    assert rules == (KeywordTagRule(tag="SUMMER", keywords=("ice cream",)),)
+
+
+def test_parse_keyword_rules_rejects_hyphenated_keyword() -> None:
     with pytest.raises(InvalidKeywordRulesError, match="alphanumeric"):
-        parse_keyword_rules('[[rule]]\ntag = "WINTER"\nkeywords = ["ice cream"]\n')
+        parse_keyword_rules('[[rule]]\ntag = "SUMMER"\nkeywords = ["ice-cream"]\n')
+
+
+def test_parse_keyword_rules_rejects_tab_in_keyword() -> None:
+    with pytest.raises(InvalidKeywordRulesError, match="alphanumeric"):
+        parse_keyword_rules('[[rule]]\ntag = "SUMMER"\nkeywords = ["ice\\tcream"]\n')
+
+
+@pytest.mark.parametrize("title", ["ICE-Cream", "Ice Cream"])
+def test_ice_cream_titles_propose_summer(title: str) -> None:
+    rules = parse_keyword_rules(RULES_PATH.read_text(encoding="utf-8"))
+    matches = match_keywords(title, "", rules)
+    summer = next(match for match in matches if match.tag == "SUMMER")
+
+    assert "ice cream" in summer.keywords
+
+    proposal = propose_tagged_episode(parse_filename("Oswald_S01E01.mp4"), matches)
+
+    assert proposal.episode.season_tag is SeasonTag.SUMMER
+    assert proposal.episode.filename == "Oswald_S01E01_SUMMER.mp4"
+    assert all(match.tag != "WINTER" for match in proposal.applied_matches)
+
+
+def test_longer_phrase_beats_earlier_same_kind_rule() -> None:
+    rules = (
+        KeywordTagRule(tag="WINTER", keywords=("ice",)),
+        KeywordTagRule(tag="SUMMER", keywords=("ice cream",)),
+    )
+    episode = parse_filename("Oswald_S01E01.mp4")
+    matches = match_keywords("ICE-Cream", "", rules)
+
+    proposal = propose_tagged_episode(episode, matches)
+
+    assert proposal.episode.season_tag is SeasonTag.SUMMER
+    assert [match.tag for match in proposal.applied_matches] == ["SUMMER"]
 
 
 def test_parse_keyword_rules_deduplicates_keywords() -> None:
