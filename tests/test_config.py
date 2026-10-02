@@ -18,6 +18,7 @@ from tv90.config import (
     SUMMER_MONTHS,
     WINTER_MONTHS,
     InvalidSettingsError,
+    load_interstitials_path,
     load_library_path,
     load_settings,
 )
@@ -219,4 +220,20 @@ def test_load_library_path_treats_blank_as_default() -> None:
 def test_load_library_path_uses_override() -> None:
     assert load_library_path({"TV90_LIBRARY_PATH": "/mnt/cartoons"}) == Path(
         "/mnt/cartoons"
+    )
+
+
+def test_load_interstitials_path_defaults_to_srv_mount() -> None:
+    assert load_interstitials_path({}) == Path("/srv/90stv/interstitials")
+
+
+def test_load_interstitials_path_treats_blank_as_default() -> None:
+    assert load_interstitials_path({"TV90_INTERSTITIALS_PATH": "  "}) == Path(
+        "/srv/90stv/interstitials"
+    )
+
+
+def test_load_interstitials_path_uses_override() -> None:
+    assert load_interstitials_path({"TV90_INTERSTITIALS_PATH": "/mnt/bumpers"}) == Path(
+        "/mnt/bumpers"
     )

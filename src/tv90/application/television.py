@@ -19,10 +19,12 @@ from tv90.domain.duration import (
 )
 from tv90.domain.episode import Episode
 from tv90.domain.holiday_calendar import HolidayCalendar
+from tv90.domain.interstitial import interstitial_pick_seed, pick_interstitial
 from tv90.domain.lineup import ChannelLineup
 from tv90.domain.timeline import SECONDS_PER_HOUR, Slot, Timeline
 from tv90.ports.clock import Clock
 from tv90.ports.duration import DurationIndex
+from tv90.ports.interstitial import InterstitialCatalog
 from tv90.ports.library import LibrarySource
 from tv90.ports.player import (
     MINIMUM_PLAYER_VOLUME,
@@ -69,10 +71,14 @@ class PlayKind(Enum):
 class ControllerMode(Enum):
     WAITING_FOR_CLOCK = "waiting_for_clock"
     PLAYING = "playing"
+    PLAYING_INTERSTITIAL = "playing_interstitial"
     IDLE = "idle"
     SLATE = "slate"
     PRE_SIGN_ON = "pre_sign_on"
     NIGHT_LOCK = "night_lock"
+
+
+INTERSTITIAL_START_OFFSET_SECONDS = 0.0
 
 
 @dataclass(frozen=True)
@@ -81,6 +87,7 @@ class TelevisionCollaborators:
     player: Player
     tv_power: TvPower
     library: LibrarySource
+    interstitial_catalog: InterstitialCatalog
     duration_index: DurationIndex
     settings: Settings
     holiday_calendar: HolidayCalendar
@@ -108,6 +115,8 @@ class TelevisionController:
         self._awaiting_trust_retune = False
         self._last_command_at: datetime | None = None
         self._current_filename: str | None = None
+        self._ended_episode_filename: str | None = None
+        self._last_interstitial_by_channel: dict[int, str] = {}
         self._episode_snapshot: tuple[Episode, ...] | None = None
 
     def now_playing(self) -> str:
@@ -156,7 +165,7 @@ class TelevisionController:
             self._log_exception(error)
             self._show_slate_quietly()
             self._mode = ControllerMode.SLATE
-            self._current_filename = None
+            self._clear_playback_filenames()
 
     def run(self) -> None:
         while True:
@@ -183,19 +192,16 @@ class TelevisionController:
         coerced = self._lineup.coerce_current_channel(self._channel_number, on_date)
         if coerced != self._channel_number:
             self._channel_number = coerced
-            if self._mode is ControllerMode.PLAYING:
+            if self._is_in_playback():
                 self._tune_to_live_airing()
             return
         if self._awaiting_trust_retune and self._collaborators.clock.is_trusted():
             self._awaiting_trust_retune = False
-            if self._mode is ControllerMode.PLAYING:
+            if self._is_in_playback():
                 self._tune_to_live_airing()
             return
-        if (
-            self._mode is ControllerMode.PLAYING
-            and self._collaborators.player.playback_has_ended()
-        ):
-            self._join_live_airing()
+        if self._collaborators.player.playback_has_ended():
+            self._handle_playback_ended()
 
     def _clock_gate_ready(self) -> bool:
         if self._clock_gate_open:
@@ -228,18 +234,18 @@ class TelevisionController:
             return
         self._collaborators.player.show_slate()
         self._mode = ControllerMode.PRE_SIGN_ON
-        self._current_filename = None
+        self._clear_playback_filenames()
 
     def _enter_night_lock(self) -> None:
         self._collaborators.player.show_slate()
         self._mode = ControllerMode.NIGHT_LOCK
-        self._current_filename = None
+        self._clear_playback_filenames()
         self._awaiting_trust_retune = False
 
     def _enter_idle(self) -> None:
         self._collaborators.player.show_slate()
         self._mode = ControllerMode.IDLE
-        self._current_filename = None
+        self._clear_playback_filenames()
 
     def _handle_channel_button(self, neighbor: Callable[[int, date], int]) -> None:
         if not self._accepts_remote_commands():
@@ -255,37 +261,102 @@ class TelevisionController:
         self._mark_command()
 
     def _wake_current_channel(self) -> None:
+        self._forget_ended_episode()
         self._volume = self._collaborators.settings.volume_default
         self._collaborators.player.set_volume(self._volume)
         self._awaiting_trust_retune = not self._collaborators.clock.is_trusted()
         airing = self._resolve_airing()
         if isinstance(airing, OutsideBroadcastDay):
-            self._collaborators.player.show_slate()
-            self._mode = ControllerMode.SLATE
-            self._current_filename = None
+            self._hold_slate()
             return
         self._play_airing(airing, PlayKind.LOAD)
         self._collaborators.player.show_channel_banner(self._channel_number)
 
     def _tune_to_live_airing(self) -> None:
+        self._forget_ended_episode()
         airing = self._resolve_airing()
         if isinstance(airing, OutsideBroadcastDay):
-            self._collaborators.player.show_slate()
-            self._mode = ControllerMode.SLATE
-            self._current_filename = None
+            self._hold_slate()
             self._collaborators.player.show_channel_banner(self._channel_number)
             return
         self._play_airing(airing, PlayKind.TUNE)
         self._collaborators.player.show_channel_banner(self._channel_number)
+
+    def _handle_playback_ended(self) -> None:
+        if self._mode is ControllerMode.PLAYING_INTERSTITIAL:
+            self._finish_episode_break()
+            return
+        if self._mode is ControllerMode.PLAYING:
+            self._begin_episode_break_or_join()
+
+    def _begin_episode_break_or_join(self) -> None:
+        self._ended_episode_filename = self._current_filename
+        if self._try_start_interstitial():
+            return
+        self._join_live_airing()
+        self._forget_ended_episode()
+
+    def _finish_episode_break(self) -> None:
+        if self._ended_episode_filename is not None:
+            self._current_filename = self._ended_episode_filename
+        self._forget_ended_episode()
+        self._join_live_airing()
+
+    def _try_start_interstitial(self) -> bool:
+        try:
+            candidates = self._collaborators.interstitial_catalog.filenames_for(
+                self._channel_number
+            )
+        except Exception as error:
+            self._log_exception(error)
+            return False
+        if not candidates:
+            return False
+        now = self._collaborators.clock.now()
+        picked = pick_interstitial(
+            candidates,
+            seed=interstitial_pick_seed(
+                now.date(), self._channel_number, decimal_clock_hour(now)
+            ),
+            recently_played=self._recent_interstitial_for_channel(),
+        )
+        if picked is None:
+            return False
+        if not self._play_interstitial_with_hdmi_retry(picked):
+            return False
+        self._last_interstitial_by_channel[self._channel_number] = picked
+        return True
+
+    def _recent_interstitial_for_channel(self) -> tuple[str, ...]:
+        last_played = self._last_interstitial_by_channel.get(self._channel_number)
+        if last_played is None:
+            return ()
+        return (last_played,)
+
+    def _play_interstitial_with_hdmi_retry(self, filename: str) -> bool:
+        last_attempt = HDMI_LOAD_RETRY_COUNT
+        for attempt in range(last_attempt + 1):
+            try:
+                self._collaborators.player.play_interstitial(
+                    filename, INTERSTITIAL_START_OFFSET_SECONDS
+                )
+            except Exception as error:
+                self._log_exception(error)
+                if attempt == last_attempt:
+                    return False
+                self._collaborators.wait(HDMI_RETRY_WAIT_SECONDS)
+                continue
+            self._current_filename = filename
+            self._mode = ControllerMode.PLAYING_INTERSTITIAL
+            return True
+        return False
 
     def _join_live_airing(self) -> None:
         # Night lock is handled before this method; remaining OutsideBroadcastDay
         # is an empty channel or a gap, which holds the slate.
         airing = self._resolve_airing()
         if isinstance(airing, OutsideBroadcastDay):
-            self._collaborators.player.show_slate()
-            self._mode = ControllerMode.SLATE
-            self._current_filename = None
+            self._hold_slate()
             return
         if (
             self._current_filename is not None
@@ -293,9 +364,7 @@ class TelevisionController:
         ):
             successor = self._next_slot_after(airing.slot)
             if successor is None:
-                self._collaborators.player.show_slate()
-                self._mode = ControllerMode.SLATE
-                self._current_filename = None
+                self._hold_slate()
                 return
             self._play_filename_or_skip(
                 successor.episode.filename,
@@ -348,9 +417,7 @@ class TelevisionController:
                 skip_kind,
             ):
                 return
-        self._collaborators.player.show_slate()
-        self._mode = ControllerMode.SLATE
-        self._current_filename = None
+        self._hold_slate()
 
     def _play_with_hdmi_retry(
         self, filename: str, offset_seconds: float, kind: PlayKind
@@ -458,6 +525,24 @@ class TelevisionController:
 
     def _mark_command(self) -> None:
         self._last_command_at = self._collaborators.clock.now()
+
+    def _is_in_playback(self) -> bool:
+        return (
+            self._mode is ControllerMode.PLAYING
+            or self._mode is ControllerMode.PLAYING_INTERSTITIAL
+        )
+
+    def _hold_slate(self) -> None:
+        self._collaborators.player.show_slate()
+        self._mode = ControllerMode.SLATE
+        self._clear_playback_filenames()
+
+    def _clear_playback_filenames(self) -> None:
+        self._current_filename = None
+        self._ended_episode_filename = None
+
+    def _forget_ended_episode(self) -> None:
+        self._ended_episode_filename = None
 
     def _show_slate_quietly(self) -> None:
         try:

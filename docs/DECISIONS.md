@@ -223,4 +223,12 @@ Already-made choices. Do not reopen them without a new requirement.
 
 - **Dry-run tagger is read-only including the metadata cache.** `python -m tv90 tag` without `--apply` may read `.tv90-metadata-cache.json` but must not create or update it. `--apply` may write the cache. E2E copies of `sample_library` ignore a leftover hidden cache so a laptop `tv90 tag` cannot fail the no-write assertion.
 
+## T18
+
+- **Episode breaks are an application pause, not timeline slots.** After EOF while `PLAYING`, if `InterstitialCatalog.filenames_for(channel)` is non-empty, the controller plays one bumper at offset 0 (`play_interstitial`, hard cut, mode `PLAYING_INTERSTITIAL`) then, on bumper EOF, restores the ended episode filename and calls `_join_live_airing()` (fade, wall-clock offset, early-EOF skip). The daily timeline stays a pure function of date/channel/library.
+- **Bumpers live under `/srv/90stv/interstitials/ch0N`, never the episode library.** Each of the three cartoon channels has its own local bumper folder (`ch01` Little Bear, `ch02` Oswald, `ch03` Harry); holiday has a fourth (`ch04`) if present. `TV90_INTERSTITIALS_PATH` overrides the root (same blank-means-default rule as `TV90_LIBRARY_PATH`). Extensions are `mp4`/`mkv`/`avi`; hidden files skipped; no recursion. `FilesystemInterstitialCatalog` returns relative names `ch0N/file.mp4` so `LibraryPathPlayer` can resolve them under the interstitials root. Absolute paths pass through. Episode basenames still resolve under the library root.
+- **Fail-soft.** Empty/missing catalog, unknown channel, catalog exception, or failed bumper load → today’s fade-join. No bumper on channel tune, idle wake `load`, night lock, pre-sign-on, or empty join/slate. Channel change during a bumper cancels the pending join and `tune_to` live airing. Night lock during a bumper cuts to off-air slate.
+- **Pick is seeded.** `pick_interstitial` uses `random.Random(seed)` with sha256 of `{isoformat}|{channel}|{clock_hour:.6f}`. Last bumper for that channel is skipped when another candidate exists. No global RNG. No I/O in domain. `now_playing` during a break is `CH 0N <interstitial-filename>`.
+- **`play_interstitial` is a Player port method** so FakePlayer can assert a dedicated command. MpvIpcPlayer implements it as `load` (no fade filters). `_play_with_hdmi_retry` still marks episodes `PLAYING` only.
+
 

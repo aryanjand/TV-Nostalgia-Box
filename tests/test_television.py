@@ -6,11 +6,13 @@ import pytest
 
 from tv90.adapters.fake_clock import FakeClock
 from tv90.adapters.fake_duration import FakeDurationIndex
+from tv90.adapters.fake_interstitial_catalog import FakeInterstitialCatalog
 from tv90.adapters.fake_library import FakeLibrarySource
 from tv90.adapters.fake_player import (
     FadeJoinCommand,
     FakePlayer,
     LoadCommand,
+    PlayInterstitialCommand,
     SetVolumeCommand,
     ShowChannelBannerCommand,
     ShowVolumeBarCommand,
@@ -21,6 +23,7 @@ from tv90.application.duration_lookup import DurationLookup
 from tv90.application.television import (
     HDMI_LOAD_RETRY_COUNT,
     HDMI_RETRY_WAIT_SECONDS,
+    INTERSTITIAL_START_OFFSET_SECONDS,
     NOW_PLAYING_CLOCK_NOT_SYNCED,
     NOW_PLAYING_OFF_AIR,
     NOW_PLAYING_SLATE,
@@ -46,8 +49,10 @@ from tv90.domain.duration import ProbeFailedError
 from tv90.domain.episode import Episode
 from tv90.domain.filename import parse_filename
 from tv90.domain.holiday_calendar import HolidayCalendar
+from tv90.domain.interstitial import interstitial_pick_seed, pick_interstitial
 from tv90.domain.timeline import SECONDS_PER_HOUR, Timeline
 from tv90.ports.duration import DurationIndex
+from tv90.ports.interstitial import InterstitialCatalog
 from tv90.ports.library import LibrarySource
 from tv90.ports.player import VOLUME_BAR_SEGMENT_COUNT, format_channel_banner
 
@@ -72,6 +77,21 @@ HALLOWEEN_MOVIE = parse_filename("Holiday_GreatPumpkin_HALLOWEEN.mp4")
 
 DAYTIME_LIBRARY = (LITTLE_BEAR_ONE, LITTLE_BEAR_TWO, OSWALD_ONE, HARRY_ONE)
 HOUR_DURATIONS = {episode.filename: ONE_HOUR_SECONDS for episode in DAYTIME_LIBRARY}
+CH01_BREAK_ONE = "ch01_break_a.mp4"
+CH01_BREAK_TWO = "ch01_break_b.mp4"
+CH01_BUMPERS = (CH01_BREAK_ONE, CH01_BREAK_TWO)
+CH01_PACK = (
+    "ch01/little_bear_ident_16s.mp4",
+    "ch01/little_bear_back_to_show_23s.mp4",
+)
+CH02_PACK = (
+    "ch02/oswald_ident_16s.mp4",
+    "ch02/oswald_be_right_back_23s.mp4",
+)
+CH03_PACK = (
+    "ch03/harry_ident_16s.mp4",
+    "ch03/harry_be_right_back_23s.mp4",
+)
 
 
 class RecordingLogger:
@@ -115,6 +135,11 @@ class ExplodingLibrary:
         return ()
 
 
+class ExplodingCatalog:
+    def filenames_for(self, channel_number: int) -> tuple[str, ...]:
+        raise RuntimeError("catalog exploded")
+
+
 class FailingProber:
     def duration_seconds(self, filename: str) -> float:
         raise ProbeFailedError(filename, "media file is missing")
@@ -139,6 +164,11 @@ class FailListedPlayer(FakePlayer):
         if filename in self._failing_filenames:
             raise OSError("corrupt file")
         super().fade_to_next(filename, offset_seconds)
+
+    def play_interstitial(self, filename: str, offset_seconds: float) -> None:
+        if filename in self._failing_filenames:
+            raise OSError("corrupt file")
+        super().play_interstitial(filename, offset_seconds)
 
 
 class FlakyLoadPlayer(FakePlayer):
@@ -194,6 +224,7 @@ def _controller(
     player: FakePlayer | None = None,
     tv_power: FakeTvPower | None = None,
     library: LibrarySource | None = None,
+    interstitial_catalog: InterstitialCatalog | None = None,
     duration_index: FakeDurationIndex | DurationLookup | None = None,
     wait: RecordingWait | CountingWait | None = None,
     logger: RecordingLogger | None = None,
@@ -217,6 +248,11 @@ def _controller(
             player=resolved_player,
             tv_power=resolved_power,
             library=resolved_library,
+            interstitial_catalog=(
+                interstitial_catalog
+                if interstitial_catalog is not None
+                else FakeInterstitialCatalog()
+            ),
             duration_index=resolved_index,
             settings=settings,
             holiday_calendar=HolidayCalendar.from_defaults(settings),
@@ -250,6 +286,14 @@ def _tune_commands(player: FakePlayer) -> tuple[TunerChangeCommand, ...]:
 def _fade_commands(player: FakePlayer) -> tuple[FadeJoinCommand, ...]:
     return tuple(
         command for command in player.commands if isinstance(command, FadeJoinCommand)
+    )
+
+
+def _interstitial_commands(player: FakePlayer) -> tuple[PlayInterstitialCommand, ...]:
+    return tuple(
+        command
+        for command in player.commands
+        if isinstance(command, PlayInterstitialCommand)
     )
 
 
@@ -962,6 +1006,292 @@ def test_early_eof_on_last_slot_holds_slate(tmp_path: Path) -> None:
     assert player.showing_slate is True
     assert controller.now_playing() == NOW_PLAYING_SLATE
     assert _fade_commands(player) == ()
+
+
+def _ch01_catalog() -> FakeInterstitialCatalog:
+    return FakeInterstitialCatalog({LITTLE_BEAR_CHANNEL_NUMBER: CH01_BUMPERS})
+
+
+def _cartoon_catalog() -> FakeInterstitialCatalog:
+    return FakeInterstitialCatalog(
+        {
+            LITTLE_BEAR_CHANNEL_NUMBER: CH01_PACK,
+            OSWALD_CHANNEL_NUMBER: CH02_PACK,
+            HARRY_CHANNEL_NUMBER: CH03_PACK,
+        }
+    )
+
+
+def _expected_bumper(
+    moment: datetime,
+    recently_played: tuple[str, ...] = (),
+) -> str:
+    picked = pick_interstitial(
+        CH01_BUMPERS,
+        seed=interstitial_pick_seed(
+            moment.date(),
+            LITTLE_BEAR_CHANNEL_NUMBER,
+            decimal_clock_hour(moment),
+        ),
+        recently_played=recently_played,
+    )
+    assert picked is not None
+    return picked
+
+
+def test_episode_eof_with_catalog_plays_interstitial_not_fade(tmp_path: Path) -> None:
+    clock = FakeClock.trusted(JULY_SIGN_ON)
+    controller, _, player, _ = _controller(
+        tmp_path, clock=clock, interstitial_catalog=_ch01_catalog()
+    )
+    _wake(controller)
+    first_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[0]
+    assert _load_commands(player)[-1].filename == first_slot.episode.filename
+
+    player.mark_playback_ended()
+    controller.tick()
+
+    bumpers = _interstitial_commands(player)
+    assert bumpers[-1].filename == _expected_bumper(JULY_SIGN_ON)
+    assert bumpers[-1].offset_seconds == INTERSTITIAL_START_OFFSET_SECONDS
+    assert _fade_commands(player) == ()
+    assert controller.now_playing() == (
+        f"{format_channel_banner(LITTLE_BEAR_CHANNEL_NUMBER)} {bumpers[-1].filename}"
+    )
+
+
+def test_interstitial_eof_fades_to_next_episode(tmp_path: Path) -> None:
+    clock = FakeClock.trusted(JULY_SIGN_ON)
+    controller, _, player, _ = _controller(
+        tmp_path, clock=clock, interstitial_catalog=_ch01_catalog()
+    )
+    _wake(controller)
+    first_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[0]
+    second_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[1]
+    player.mark_playback_ended()
+    controller.tick()
+    assert _interstitial_commands(player)
+
+    player.mark_playback_ended()
+    clock.advance_time(timedelta(hours=1))
+    controller.tick()
+
+    fades = _fade_commands(player)
+    assert fades[-1].filename == second_slot.episode.filename
+    assert fades[-1].offset_seconds == pytest.approx(0.0)
+    assert first_slot.episode.filename != second_slot.episode.filename
+
+
+def test_interstitial_pick_is_seeded_for_clock_channel_and_date(tmp_path: Path) -> None:
+    first_clock = FakeClock.trusted(JULY_SIGN_ON)
+    first_controller, _, first_player, _ = _controller(
+        tmp_path / "a", clock=first_clock, interstitial_catalog=_ch01_catalog()
+    )
+    _wake(first_controller)
+    first_player.mark_playback_ended()
+    first_controller.tick()
+
+    second_clock = FakeClock.trusted(JULY_SIGN_ON)
+    second_controller, _, second_player, _ = _controller(
+        tmp_path / "b", clock=second_clock, interstitial_catalog=_ch01_catalog()
+    )
+    _wake(second_controller)
+    second_player.mark_playback_ended()
+    second_controller.tick()
+
+    assert _interstitial_commands(first_player)[-1].filename == _expected_bumper(
+        JULY_SIGN_ON
+    )
+    assert (
+        _interstitial_commands(first_player)[-1].filename
+        == _interstitial_commands(second_player)[-1].filename
+    )
+
+
+def test_later_hour_can_pick_a_different_bumper(tmp_path: Path) -> None:
+    later = JULY_SIGN_ON + timedelta(hours=2)
+    assert interstitial_pick_seed(
+        JULY_SIGN_ON.date(),
+        LITTLE_BEAR_CHANNEL_NUMBER,
+        decimal_clock_hour(JULY_SIGN_ON),
+    ) != interstitial_pick_seed(
+        later.date(), LITTLE_BEAR_CHANNEL_NUMBER, decimal_clock_hour(later)
+    )
+    clock = FakeClock.trusted(later)
+    controller, _, player, _ = _controller(
+        tmp_path, clock=clock, interstitial_catalog=_ch01_catalog()
+    )
+    _wake(controller)
+    player.mark_playback_ended()
+    controller.tick()
+
+    assert _interstitial_commands(player)[-1].filename == _expected_bumper(later)
+
+
+def test_last_bumper_is_not_repeated_when_pool_has_another(tmp_path: Path) -> None:
+    clock = FakeClock.trusted(JULY_SIGN_ON)
+    controller, _, player, _ = _controller(
+        tmp_path, clock=clock, interstitial_catalog=_ch01_catalog()
+    )
+    _wake(controller)
+    player.mark_playback_ended()
+    controller.tick()
+    first = _interstitial_commands(player)[-1].filename
+
+    player.mark_playback_ended()
+    controller.tick()
+    player.mark_playback_ended()
+    clock.advance_time(timedelta(hours=2))
+    controller.tick()
+    second = _interstitial_commands(player)[-1].filename
+
+    assert second == _expected_bumper(clock.now(), recently_played=(first,))
+    assert second != first
+
+
+def test_channel_up_does_not_play_a_bumper(tmp_path: Path) -> None:
+    controller, clock, player, _ = _controller(
+        tmp_path, interstitial_catalog=_ch01_catalog()
+    )
+    _wake(controller)
+    clock.advance_time(COOLDOWN)
+    controller.channel_up()
+
+    assert _interstitial_commands(player) == ()
+    assert _tune_commands(player)
+    assert player.current_filename == OSWALD_ONE.filename
+
+
+def test_channel_change_during_bumper_tunes_live_airing(tmp_path: Path) -> None:
+    controller, clock, player, _ = _controller(
+        tmp_path, interstitial_catalog=_ch01_catalog()
+    )
+    _wake(controller)
+    player.mark_playback_ended()
+    controller.tick()
+    assert _interstitial_commands(player)
+
+    clock.advance_time(COOLDOWN)
+    controller.channel_up()
+
+    assert _tune_commands(player)
+    assert _tune_commands(player)[-1].filename == OSWALD_ONE.filename
+    assert player.current_filename == OSWALD_ONE.filename
+    assert _fade_commands(player) == ()
+
+
+def test_night_lock_during_bumper_cuts_to_off_air_without_fade(
+    tmp_path: Path,
+) -> None:
+    clock = FakeClock.trusted(JULY_NIGHT_LOCK - timedelta(minutes=1))
+    controller, _, player, power = _controller(
+        tmp_path, clock=clock, interstitial_catalog=_ch01_catalog()
+    )
+    _wake(controller)
+    player.mark_playback_ended()
+    controller.tick()
+    assert _interstitial_commands(player)
+
+    clock.advance_time(timedelta(minutes=1))
+    controller.tick()
+
+    assert power.commands == ()
+    assert _fade_commands(player) == ()
+    assert player.showing_slate is True
+    assert controller.now_playing() == NOW_PLAYING_OFF_AIR
+
+
+def test_failed_bumper_load_joins_live_airing(tmp_path: Path) -> None:
+    settings = load_settings({})
+    player = FailListedPlayer(settings, frozenset(CH01_BUMPERS))
+    clock = FakeClock.trusted(JULY_SIGN_ON)
+    controller, _, _, _ = _controller(
+        tmp_path,
+        clock=clock,
+        player=player,
+        interstitial_catalog=_ch01_catalog(),
+    )
+    _wake(controller)
+    second_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[1]
+    player.mark_playback_ended()
+    clock.advance_time(timedelta(hours=1))
+    controller.tick()
+
+    assert _interstitial_commands(player) == ()
+    fades = _fade_commands(player)
+    assert fades[-1].filename == second_slot.episode.filename
+
+
+def test_empty_catalog_eof_still_fade_joins(tmp_path: Path) -> None:
+    clock = FakeClock.trusted(JULY_SIGN_ON)
+    controller, _, player, _ = _controller(tmp_path, clock=clock)
+    _wake(controller)
+    second_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[1]
+    player.mark_playback_ended()
+    clock.advance_time(timedelta(hours=1))
+    controller.tick()
+
+    assert _interstitial_commands(player) == ()
+    assert _fade_commands(player)[-1].filename == second_slot.episode.filename
+
+
+def test_catalog_error_joins_live_airing(tmp_path: Path) -> None:
+    clock = FakeClock.trusted(JULY_SIGN_ON)
+    logger = RecordingLogger()
+    controller, _, player, _ = _controller(
+        tmp_path,
+        clock=clock,
+        interstitial_catalog=ExplodingCatalog(),
+        logger=logger,
+    )
+    _wake(controller)
+    second_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[1]
+    player.mark_playback_ended()
+    clock.advance_time(timedelta(hours=1))
+    controller.tick()
+
+    assert _interstitial_commands(player) == ()
+    assert _fade_commands(player)[-1].filename == second_slot.episode.filename
+    assert logger.errors
+
+
+def test_episode_eof_plays_bumper_for_the_tuned_cartoon_channel(
+    tmp_path: Path,
+) -> None:
+    controller, clock, player, _ = _controller(
+        tmp_path, interstitial_catalog=_cartoon_catalog()
+    )
+    _wake(controller)
+    player.mark_playback_ended()
+    controller.tick()
+    little = _interstitial_commands(player)[-1].filename
+    assert little in CH01_PACK
+    assert little.startswith("ch01/")
+    assert "little_bear" in little
+    assert "oswald" not in little
+    assert "harry" not in little
+
+    clock.advance_time(COOLDOWN)
+    controller.channel_up()
+    player.mark_playback_ended()
+    controller.tick()
+    oswald = _interstitial_commands(player)[-1].filename
+    assert oswald in CH02_PACK
+    assert oswald.startswith("ch02/")
+    assert "oswald" in oswald
+    assert "little_bear" not in oswald
+    assert "harry" not in oswald
+
+    clock.advance_time(COOLDOWN)
+    controller.channel_up()
+    player.mark_playback_ended()
+    controller.tick()
+    harry = _interstitial_commands(player)[-1].filename
+    assert harry in CH03_PACK
+    assert harry.startswith("ch03/")
+    assert "harry" in harry
+    assert "oswald" not in harry
+    assert "little_bear" not in harry
 
 
 def test_television_module_does_not_import_metadata_source() -> None:

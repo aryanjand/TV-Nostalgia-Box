@@ -20,6 +20,8 @@ SIGN_ON_ENVIRONMENT_NAME = "TV90_SIGN_ON"
 NIGHT_LOCK_ENVIRONMENT_NAME = "TV90_NIGHT_LOCK"
 LIBRARY_PATH_ENVIRONMENT_NAME = "TV90_LIBRARY_PATH"
 DEFAULT_LIBRARY_PATH = Path("/srv/90stv/library")
+INTERSTITIALS_PATH_ENVIRONMENT_NAME = "TV90_INTERSTITIALS_PATH"
+DEFAULT_INTERSTITIALS_PATH = Path("/srv/90stv/interstitials")
 
 DEFAULT_TIMEZONE_NAME = "America/Vancouver"
 DEFAULT_CLOCK_TRUST_TIMEOUT_SECONDS = 180
@@ -127,9 +129,20 @@ class Settings:
 
 def load_library_path(environ: Mapping[str, str]) -> Path:
     """Library mount. Missing or blank TV90_LIBRARY_PATH keeps the Pi default."""
-    raw_value = _optional_stripped(environ, LIBRARY_PATH_ENVIRONMENT_NAME)
+    return _load_path(environ, LIBRARY_PATH_ENVIRONMENT_NAME, DEFAULT_LIBRARY_PATH)
+
+
+def load_interstitials_path(environ: Mapping[str, str]) -> Path:
+    """Bumper root. Missing or blank TV90_INTERSTITIALS_PATH keeps the Pi default."""
+    return _load_path(
+        environ, INTERSTITIALS_PATH_ENVIRONMENT_NAME, DEFAULT_INTERSTITIALS_PATH
+    )
+
+
+def _load_path(environ: Mapping[str, str], variable_name: str, default: Path) -> Path:
+    raw_value = _optional_stripped(environ, variable_name)
     if raw_value is None or raw_value == "":
-        return DEFAULT_LIBRARY_PATH
+        return default
     return Path(raw_value)
 
 

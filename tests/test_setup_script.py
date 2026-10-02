@@ -68,6 +68,7 @@ def test_setup_script_is_idempotent_about_fstab_and_units() -> None:
     assert "fstab" in SETUP_SCRIPT
     assert "ro" in SETUP_SCRIPT
     assert "/srv/90stv/library" in SETUP_SCRIPT
+    assert "/srv/90stv/interstitials" in SETUP_SCRIPT
     assert "90stv.service" in SETUP_SCRIPT
     assert "tv90-maintenance" in SETUP_SCRIPT
     assert "90stv-library-rw.service" in SETUP_SCRIPT
@@ -79,6 +80,7 @@ def test_unit_file_restarts_always_and_logs_to_journal() -> None:
     assert "After=network-online.target sound.target" in UNIT_FILE
     assert "User=tv90" in UNIT_FILE
     assert "Environment=TV90_LIBRARY_PATH=/srv/90stv/library" in UNIT_FILE
+    assert "Environment=TV90_INTERSTITIALS_PATH=/srv/90stv/interstitials" in UNIT_FILE
     assert "StandardOutput=journal" in UNIT_FILE
     assert "TTYPath=/dev/tty1" in UNIT_FILE
     assert "StandardInput=tty" in UNIT_FILE

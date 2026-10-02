@@ -9,15 +9,16 @@ from flask.testing import FlaskClient
 
 from tv90.adapters.fake_clock import FakeClock
 from tv90.adapters.fake_duration import FakeDurationIndex, FakeMediaProber
+from tv90.adapters.fake_interstitial_catalog import FakeInterstitialCatalog
 from tv90.adapters.fake_library import FakeLibrarySource
-from tv90.adapters.fake_player import FakePlayer, LoadCommand
+from tv90.adapters.fake_player import FakePlayer, LoadCommand, PlayInterstitialCommand
 from tv90.adapters.fake_tv_power import FakeTvPower
 from tv90.application.simulate import DURATION_INDEX_FILENAME
 from tv90.application.television import (
     NOW_PLAYING_SLATE,
     TICK_INTERVAL_SECONDS,
 )
-from tv90.config import DEFAULT_LIBRARY_PATH, load_settings
+from tv90.config import DEFAULT_INTERSTITIALS_PATH, DEFAULT_LIBRARY_PATH, load_settings
 from tv90.domain.duration import DurationUnknownError
 from tv90.domain.filename import parse_filename
 from tv90.domain.timeline import SECONDS_PER_HOUR
@@ -93,6 +94,7 @@ def test_build_runtime_defaults_library_path_to_srv_mount() -> None:
     )
 
     assert runtime.library_path == DEFAULT_LIBRARY_PATH
+    assert runtime.interstitials_path == DEFAULT_INTERSTITIALS_PATH
 
 
 def test_build_runtime_reads_library_path_from_environ(tmp_path: Path) -> None:
@@ -107,6 +109,21 @@ def test_build_runtime_reads_library_path_from_environ(tmp_path: Path) -> None:
     )
 
     assert runtime.library_path == tmp_path
+
+
+def test_build_runtime_reads_interstitials_path_from_environ(tmp_path: Path) -> None:
+    bumpers = tmp_path / "bumpers"
+    runtime = build_runtime(
+        {"TV90_INTERSTITIALS_PATH": str(bumpers)},
+        clock=FakeClock.trusted(JULY_MORNING),
+        player=FakePlayer(load_settings({})),
+        tv_power=FakeTvPower(),
+        library=FakeLibrarySource(DAYTIME_LIBRARY),
+        duration_index=FakeDurationIndex(HOUR_DURATIONS),
+        wait=_noop_wait,
+    )
+
+    assert runtime.interstitials_path == bumpers
 
 
 def test_build_runtime_remote_app_uses_controller_now_playing() -> None:
@@ -130,12 +147,69 @@ def test_build_runtime_remote_app_uses_controller_now_playing() -> None:
 def test_library_path_player_resolves_basenames_for_mpv() -> None:
     settings = load_settings({})
     inner = FakePlayer(settings)
-    player = LibraryPathPlayer(inner, Path("/srv/90stv/library"))
+    player = LibraryPathPlayer(
+        inner, Path("/srv/90stv/library"), Path("/srv/90stv/interstitials")
+    )
 
     player.load(LITTLE_BEAR_ONE.filename, 12.0)
 
     assert inner.commands == (
         LoadCommand("/srv/90stv/library/LittleBear_S01E01.mp4", 12.0),
+    )
+
+
+def test_library_path_player_resolves_interstitial_under_interstitials_root() -> None:
+    settings = load_settings({})
+    inner = FakePlayer(settings)
+    player = LibraryPathPlayer(
+        inner, Path("/srv/90stv/library"), Path("/srv/90stv/interstitials")
+    )
+
+    player.play_interstitial("ch01/break.mp4", 0.0)
+
+    assert inner.commands == (
+        PlayInterstitialCommand("/srv/90stv/interstitials/ch01/break.mp4", 0.0),
+    )
+
+
+def test_library_path_player_absolute_paths_pass_through() -> None:
+    settings = load_settings({})
+    inner = FakePlayer(settings)
+    player = LibraryPathPlayer(
+        inner, Path("/srv/90stv/library"), Path("/srv/90stv/interstitials")
+    )
+
+    player.load("/tmp/episode.mp4", 3.0)
+    player.play_interstitial("/tmp/break.mp4", 0.0)
+
+    assert inner.commands == (
+        LoadCommand("/tmp/episode.mp4", 3.0),
+        PlayInterstitialCommand("/tmp/break.mp4", 0.0),
+    )
+
+
+def test_build_runtime_wires_injected_interstitial_catalog() -> None:
+    catalog = FakeInterstitialCatalog({1: ("ch01/break.mp4",)})
+    player = FakePlayer(load_settings({}))
+    runtime = build_runtime(
+        {},
+        clock=FakeClock.trusted(JULY_MORNING),
+        player=player,
+        tv_power=FakeTvPower(),
+        library=FakeLibrarySource(DAYTIME_LIBRARY),
+        interstitial_catalog=catalog,
+        duration_index=FakeDurationIndex(HOUR_DURATIONS),
+        wait=_noop_wait,
+    )
+    runtime.controller.tick()
+    runtime.controller.channel_up()
+    player.mark_playback_ended()
+    runtime.controller.tick()
+
+    assert any(
+        isinstance(command, PlayInterstitialCommand)
+        and command.filename == "ch01/break.mp4"
+        for command in player.commands
     )
 
 

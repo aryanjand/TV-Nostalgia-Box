@@ -11,6 +11,7 @@ User=tv90
 Group=tv90
 SupplementaryGroups=video audio render gpio
 Environment=TV90_LIBRARY_PATH=/srv/90stv/library
+Environment=TV90_INTERSTITIALS_PATH=/srv/90stv/interstitials
 Environment=PYTHONUNBUFFERED=1
 WorkingDirectory=/srv/90stv
 RuntimeDirectory=90stv

@@ -37,6 +37,12 @@ class TunerChangeCommand:
 
 
 @dataclass(frozen=True)
+class PlayInterstitialCommand:
+    filename: str
+    offset_seconds: float
+
+
+@dataclass(frozen=True)
 class ShowSlateCommand:
     slate_color: str
 
@@ -69,6 +75,7 @@ PlayerCommand = (
     LoadCommand
     | FadeJoinCommand
     | TunerChangeCommand
+    | PlayInterstitialCommand
     | ShowSlateCommand
     | ShowChannelBannerCommand
     | ShowVolumeBarCommand
@@ -169,6 +176,10 @@ class FakePlayer:
 
     def playback_has_ended(self) -> bool:
         return self._playback_ended
+
+    def play_interstitial(self, filename: str, offset_seconds: float) -> None:
+        self._begin_file(filename, offset_seconds)
+        self._commands.append(PlayInterstitialCommand(filename, offset_seconds))
 
     def mark_playback_ended(self) -> None:
         self._playback_ended = True

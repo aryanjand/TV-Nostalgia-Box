@@ -5,6 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIBRARY_PATH="/srv/90stv/library"
+INTERSTITIALS_PATH="/srv/90stv/interstitials"
 INSTALL_ROOT="/opt/90stv"
 VENV_DIR="${INSTALL_ROOT}/venv"
 TV90_USER="tv90"
@@ -87,8 +88,8 @@ ensure_timesyncd() {
 }
 
 ensure_folders() {
-  mkdir -p /srv/90stv "${LIBRARY_PATH}" "${INSTALL_ROOT}" /etc/systemd/journald.conf.d
-  chown "${TV90_USER}:${TV90_USER}" /srv/90stv "${LIBRARY_PATH}"
+  mkdir -p /srv/90stv "${LIBRARY_PATH}" "${INTERSTITIALS_PATH}" "${INSTALL_ROOT}" /etc/systemd/journald.conf.d
+  chown "${TV90_USER}:${TV90_USER}" /srv/90stv "${LIBRARY_PATH}" "${INTERSTITIALS_PATH}"
 }
 
 ensure_fstab_library() {

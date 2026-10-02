@@ -8,6 +8,7 @@ from flask.testing import FlaskClient
 
 from tv90.adapters.fake_clock import FakeClock
 from tv90.adapters.fake_duration import FakeDurationIndex
+from tv90.adapters.fake_interstitial_catalog import FakeInterstitialCatalog
 from tv90.adapters.fake_library import FakeLibrarySource
 from tv90.adapters.fake_player import (
     FakePlayer,
@@ -95,6 +96,7 @@ def _controller(
             player=resolved_player,
             tv_power=FakeTvPower(),
             library=FakeLibrarySource(episodes=DAYTIME_LIBRARY),
+            interstitial_catalog=FakeInterstitialCatalog(),
             duration_index=FakeDurationIndex(HOUR_DURATIONS),
             settings=settings,
             holiday_calendar=HolidayCalendar.from_defaults(settings),

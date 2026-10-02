@@ -11,6 +11,7 @@ from tv90.adapters.fake_player import (
     FadeJoinCommand,
     FakePlayer,
     LoadCommand,
+    PlayInterstitialCommand,
     SetVolumeCommand,
     ShowChannelBannerCommand,
     ShowSlateCommand,
@@ -76,6 +77,16 @@ def test_fake_player_load_seeks_to_offset_and_records_command() -> None:
     assert player.offset_seconds == 17.5
     assert player.showing_slate is False
     assert player.commands == (LoadCommand(LITTLE_BEAR_FILENAME, 17.5),)
+
+
+def test_fake_player_play_interstitial_is_not_a_fade() -> None:
+    player = _player()
+
+    player.play_interstitial("ch01/break.mp4", 0.0)
+
+    assert player.commands == (PlayInterstitialCommand("ch01/break.mp4", 0.0),)
+    assert player.current_filename == "ch01/break.mp4"
+    assert player.offset_seconds == 0.0
 
 
 def test_fake_player_fade_to_next_and_tune_to_are_different_events() -> None:
@@ -246,6 +257,7 @@ def test_fake_player_satisfies_player_protocol() -> None:
     player.show_volume_bar(0.4)
     player.fade_to_next(LITTLE_BEAR_NEXT_FILENAME, 0.0)
     player.tune_to(OSWALD_FILENAME, 5.0)
+    player.play_interstitial("ch01/break.mp4", 0.0)
     player.show_slate()
     player.stop()
 
@@ -263,6 +275,7 @@ def test_fake_player_does_not_write_library_files(tmp_path: Path) -> None:
     player.load(str(episode), 3.0)
     player.fade_to_next(str(episode), 0.0)
     player.tune_to(str(episode), 1.0)
+    player.play_interstitial(str(episode), 0.0)
     player.show_slate()
     player.show_channel_banner(1)
     player.show_volume_bar(0.4)
@@ -346,6 +359,7 @@ def _exercise_player(player: Player) -> None:
     player.show_volume_bar(0.4)
     player.fade_to_next(LITTLE_BEAR_NEXT_FILENAME, 0.0)
     player.tune_to(OSWALD_FILENAME, 5.0)
+    player.play_interstitial("ch01/break.mp4", 0.0)
     player.show_slate()
     player.stop()
 
@@ -365,6 +379,26 @@ def test_mpv_load_sends_loadfile_with_start_offset() -> None:
             "start=17.5",
         ]
     ]
+
+
+def test_mpv_play_interstitial_sends_loadfile_without_fade() -> None:
+    player, sender, _waiter = _mpv_player()
+
+    player.play_interstitial("ch01/break.mp4", 0.0)
+
+    loadfiles = _commands_named(sender.payloads, "loadfile")
+    assert loadfiles == [
+        [
+            "loadfile",
+            "ch01/break.mp4",
+            "replace",
+            -1,
+            "start=0.0",
+        ]
+    ]
+    serialized = repr(sender.payloads)
+    assert "fade=" not in serialized
+    assert "afade=" not in serialized
 
 
 def test_mpv_set_volume_sends_percent_scale() -> None:
@@ -578,6 +612,9 @@ def test_fake_and_mpv_satisfy_player_contract() -> None:
     assert any(isinstance(command, LoadCommand) for command in fake.commands)
     assert any(isinstance(command, FadeJoinCommand) for command in fake.commands)
     assert any(isinstance(command, TunerChangeCommand) for command in fake.commands)
+    assert any(
+        isinstance(command, PlayInterstitialCommand) for command in fake.commands
+    )
     assert _commands_named(sender.payloads, "loadfile")
     assert _commands_named(sender.payloads, "show-text")
     assert _commands_named(sender.payloads, "stop")
@@ -596,6 +633,7 @@ def test_mpv_adapter_does_not_write_library_files(tmp_path: Path) -> None:
     player.load(str(episode), 3.0)
     player.fade_to_next(str(episode), 0.0)
     player.tune_to(str(episode), 1.0)
+    player.play_interstitial(str(episode), 0.0)
     player.show_slate()
     player.show_channel_banner(1)
     player.show_volume_bar(0.4)

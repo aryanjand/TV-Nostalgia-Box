@@ -18,6 +18,7 @@ from flask import Flask
 
 from tv90.adapters.ffprobe_prober import build_ffprobe_media_prober
 from tv90.adapters.file_duration_index import FileDurationIndex
+from tv90.adapters.filesystem_interstitial_catalog import FilesystemInterstitialCatalog
 from tv90.adapters.filesystem_library import FilesystemLibrarySource
 from tv90.adapters.mpv_ipc_player import (
     MpvIpcPlayer,
@@ -34,7 +35,12 @@ from tv90.application.television import (
     TelevisionController,
     Wait,
 )
-from tv90.config import Settings, load_library_path, load_settings
+from tv90.config import (
+    Settings,
+    load_interstitials_path,
+    load_library_path,
+    load_settings,
+)
 from tv90.domain.duration import DurationUnknownError
 from tv90.domain.holiday_calendar import HolidayCalendar, load_holiday_calendar
 from tv90.interface.remote import (
@@ -44,6 +50,7 @@ from tv90.interface.remote import (
 )
 from tv90.ports.clock import Clock
 from tv90.ports.duration import DurationIndex, MediaProber
+from tv90.ports.interstitial import InterstitialCatalog
 from tv90.ports.library import LibrarySource
 from tv90.ports.player import Player
 from tv90.ports.tv_power import TvPower
@@ -56,20 +63,28 @@ StartRemote = Callable[[Flask], None]
 
 
 class LibraryPathPlayer:
-    """Resolve library basenames to absolute paths for mpv loadfile."""
+    """Resolve library and interstitial names to absolute paths for mpv loadfile."""
 
-    def __init__(self, player: Player, library_root: Path) -> None:
+    def __init__(
+        self, player: Player, library_root: Path, interstitials_root: Path
+    ) -> None:
         self._player = player
         self._library_root = library_root
+        self._interstitials_root = interstitials_root
 
     def load(self, filename: str, offset_seconds: float) -> None:
-        self._player.load(self._resolve(filename), offset_seconds)
+        self._player.load(self._resolve_library(filename), offset_seconds)
 
     def fade_to_next(self, filename: str, offset_seconds: float) -> None:
-        self._player.fade_to_next(self._resolve(filename), offset_seconds)
+        self._player.fade_to_next(self._resolve_library(filename), offset_seconds)
 
     def tune_to(self, filename: str, offset_seconds: float) -> None:
-        self._player.tune_to(self._resolve(filename), offset_seconds)
+        self._player.tune_to(self._resolve_library(filename), offset_seconds)
+
+    def play_interstitial(self, filename: str, offset_seconds: float) -> None:
+        self._player.play_interstitial(
+            self._resolve_interstitial(filename), offset_seconds
+        )
 
     def show_slate(self) -> None:
         self._player.show_slate()
@@ -89,8 +104,11 @@ class LibraryPathPlayer:
     def playback_has_ended(self) -> bool:
         return self._player.playback_has_ended()
 
-    def _resolve(self, filename: str) -> str:
-        return str(self._library_root / filename)
+    def _resolve_library(self, filename: str) -> str:
+        return _resolve_under_root(filename, self._library_root)
+
+    def _resolve_interstitial(self, filename: str) -> str:
+        return _resolve_under_root(filename, self._interstitials_root)
 
 
 class LibraryPathProber:
@@ -124,6 +142,7 @@ class Runtime:
     settings: Settings
     holiday_calendar: HolidayCalendar
     library_path: Path
+    interstitials_path: Path
 
 
 def build_runtime(
@@ -133,9 +152,11 @@ def build_runtime(
     player: Player,
     tv_power: TvPower,
     library: LibrarySource | None = None,
+    interstitial_catalog: InterstitialCatalog | None = None,
     duration_index: DurationIndex | None = None,
     wait: Wait | None = None,
     library_path: Path | None = None,
+    interstitials_path: Path | None = None,
 ) -> Runtime:
     """Wire the controller. Tests inject fakes; production main passes real ones."""
     settings = load_settings(environ)
@@ -143,10 +164,20 @@ def build_runtime(
     resolved_library_path = (
         library_path if library_path is not None else load_library_path(environ)
     )
+    resolved_interstitials_path = (
+        interstitials_path
+        if interstitials_path is not None
+        else load_interstitials_path(environ)
+    )
     resolved_library = (
         library
         if library is not None
         else FilesystemLibrarySource(resolved_library_path)
+    )
+    resolved_catalog = (
+        interstitial_catalog
+        if interstitial_catalog is not None
+        else FilesystemInterstitialCatalog(resolved_interstitials_path)
     )
     resolved_index = (
         duration_index
@@ -160,6 +191,7 @@ def build_runtime(
             player=player,
             tv_power=tv_power,
             library=resolved_library,
+            interstitial_catalog=resolved_catalog,
             duration_index=resolved_index,
             settings=settings,
             holiday_calendar=holiday_calendar,
@@ -173,6 +205,7 @@ def build_runtime(
         settings=settings,
         holiday_calendar=holiday_calendar,
         library_path=resolved_library_path,
+        interstitials_path=resolved_interstitials_path,
     )
 
 
@@ -180,15 +213,18 @@ def build_production_runtime(environ: Mapping[str, str]) -> Runtime:
     """Real adapters only. Tests never call this (would spawn mpv)."""
     settings = load_settings(environ)
     library_path = load_library_path(environ)
+    interstitials_path = load_interstitials_path(environ)
     return build_runtime(
         environ,
         clock=build_system_clock(settings.timezone),
-        player=_build_production_player(settings, library_path),
+        player=_build_production_player(settings, library_path, interstitials_path),
         tv_power=NullTvPower(),
         library=FilesystemLibrarySource(library_path),
+        interstitial_catalog=FilesystemInterstitialCatalog(interstitials_path),
         duration_index=_build_runtime_duration_index(library_path),
         wait=time.sleep,
         library_path=library_path,
+        interstitials_path=interstitials_path,
     )
 
 
@@ -229,7 +265,9 @@ def _build_runtime_duration_index(library_path: Path) -> DurationIndex:
     )
 
 
-def _build_production_player(settings: Settings, library_path: Path) -> Player:
+def _build_production_player(
+    settings: Settings, library_path: Path, interstitials_path: Path
+) -> Player:
     socket_path = str(MPV_IPC_SOCKET_PATH)
     spawn_mpv_process(socket_path, settings)
     _wait_for_mpv_socket(MPV_IPC_SOCKET_PATH)
@@ -237,7 +275,15 @@ def _build_production_player(settings: Settings, library_path: Path) -> Player:
     return LibraryPathPlayer(
         MpvIpcPlayer(settings, session.send, session.read_event),
         library_path,
+        interstitials_path,
     )
+
+
+def _resolve_under_root(filename: str, root: Path) -> str:
+    path = Path(filename)
+    if path.is_absolute():
+        return str(path)
+    return str(root / filename)
 
 
 def _wait_for_mpv_socket(socket_path: Path) -> None:

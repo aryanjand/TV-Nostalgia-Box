@@ -299,6 +299,9 @@ class MpvIpcPlayer:
         self._collect_end_events()
         return self._playback_ended
 
+    def play_interstitial(self, filename: str, offset_seconds: float) -> None:
+        self.load(filename, offset_seconds)
+
     def _begin_playback(self) -> None:
         self._collect_end_events()
         self._playback_ended = False

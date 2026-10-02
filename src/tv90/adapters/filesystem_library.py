@@ -53,13 +53,11 @@ class FilesystemLibrarySource:
                 self._library_directory, "library path is not a directory"
             )
         return tuple(
-            path
-            for path in self._library_directory.iterdir()
-            if _is_library_media_file(path)
+            path for path in self._library_directory.iterdir() if is_media_file(path)
         )
 
 
-def _is_library_media_file(path: Path) -> bool:
+def is_media_file(path: Path) -> bool:
     if not path.is_file():
         return False
     if path.name.startswith(HIDDEN_FILENAME_PREFIX):

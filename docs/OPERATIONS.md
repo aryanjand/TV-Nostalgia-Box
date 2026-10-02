@@ -20,7 +20,7 @@ You need a Raspberry Pi 4, a microSD card, an HDMI cable to the TV, and the offi
 2. Copy this project onto the Pi.
 3. On the Pi, open a terminal in the project folder and run `setup.sh` as root (`sudo ./setup.sh`). Wait until it prints that setup is complete. The hostname becomes `90stv`. Folders, the TV service, and the maintenance command are installed for you.
 4. Enter maintenance with `sudo tv90-maintenance on` (next section). The words **maintenance mode** print *before* any reboot. After the Pi comes back it will not reprint the mode. Run `sudo tv90-maintenance status` and confirm it says `maintenance mode`.
-5. Copy your episode files into `/srv/90stv/library` with `sudo` (or as the `tv90` user). Keep them in that one folder (no subfolders). Cartoon names look like `LittleBear_S01E04.mp4`. Holiday movies look like `Holiday_Rudolph_CHRISTMAS.mp4`.
+5. Copy your episode files into `/srv/90stv/library` with `sudo` (or as the `tv90` user). Keep them in that one folder (no subfolders). Cartoon names look like `LittleBear_S01E04.mp4`. Holiday movies look like `Holiday_Rudolph_CHRISTMAS.mp4`. Channel bumpers do not go in the episode folder. They live under `/srv/90stv/interstitials/ch01` through `ch04` (one folder per channel).
 6. Tag, then index (see “Adding episodes” below). Those commands also need `sudo` (or the `tv90` user).
 7. Leave maintenance with `sudo tv90-maintenance off`. **tv mode** prints before any reboot; after the Pi comes back it will not reprint the mode. The television should be on: no desktop, the stream on the set. Confirm with `sudo tv90-maintenance status` if you want the printed words.
 
@@ -104,6 +104,8 @@ These names are the household knobs. Put them on the TV service only while you a
 Night lock must be later than sign-on. Empty or nonsense values are not silently ignored; the TV will refuse to start until the line is a real number or zone name.
 
 Do not add new channels, menus, or streaming URLs. This box only plays the local library.
+
+Channel bumpers (the short break after an episode on the same channel) are local files under `/srv/90stv/interstitials/ch0N`, not `/srv/90stv/library`. Do not copy them into the episode folder. Optional override on the service: `TV90_INTERSTITIALS_PATH` (default `/srv/90stv/interstitials`).
 
 ## How to read the simulator on a laptop
 

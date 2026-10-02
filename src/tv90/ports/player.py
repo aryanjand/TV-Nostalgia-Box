@@ -61,6 +61,10 @@ class Player(Protocol):
         """CQS query: True after EOF. Does not clear the flag."""
         ...
 
+    def play_interstitial(self, filename: str, offset_seconds: float) -> None:
+        """Play a local bumper. Hard cut, never a fade or tuner burst."""
+        ...
+
 
 def require_player_volume(volume: float) -> float:
     if (

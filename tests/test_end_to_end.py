@@ -14,6 +14,7 @@ from flask.testing import FlaskClient
 
 from tv90.adapters.fake_clock import FakeClock
 from tv90.adapters.fake_duration import FakeDurationIndex
+from tv90.adapters.fake_interstitial_catalog import FakeInterstitialCatalog
 from tv90.adapters.fake_library import FakeLibrarySource
 from tv90.adapters.fake_player import (
     FakePlayer,
@@ -106,6 +107,7 @@ PLAYBACK_COLLABORATOR_FIELDS = frozenset(
         "player",
         "tv_power",
         "library",
+        "interstitial_catalog",
         "duration_index",
         "settings",
         "holiday_calendar",
@@ -137,6 +139,10 @@ class YankablePlayer(FakePlayer):
     def tune_to(self, filename: str, offset_seconds: float) -> None:
         self._reject_if_yanked(filename)
         super().tune_to(filename, offset_seconds)
+
+    def play_interstitial(self, filename: str, offset_seconds: float) -> None:
+        self._reject_if_yanked(filename)
+        super().play_interstitial(filename, offset_seconds)
 
     def _reject_if_yanked(self, filename: str) -> None:
         if filename in self._yanked:
@@ -241,6 +247,7 @@ def _controller(
             player=resolved_player,
             tv_power=resolved_power,
             library=resolved_library,
+            interstitial_catalog=FakeInterstitialCatalog(),
             duration_index=FakeDurationIndex(_durations_for(episodes)),
             settings=resolved_settings,
             holiday_calendar=calendar,
