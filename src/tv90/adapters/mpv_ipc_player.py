@@ -50,6 +50,8 @@ LOADFILE_REPLACE_FLAG = "replace"
 # mpv 0.38+ takes insert-at index before options. A map in that slot
 # errors with "argument index has incompatible type" and never plays.
 LOADFILE_REPLACE_INDEX = -1
+LOADFILE_OPTIONS_SEPARATOR = ","
+LOADFILE_OPTION_ASSIGN = "="
 LOADFILE_START_OPTION = "start"
 LOADFILE_VF_OPTION = "vf"
 LOADFILE_AF_OPTION = "af"
@@ -328,13 +330,14 @@ class MpvIpcPlayer:
             LOADFILE_START_OPTION: offset_seconds,
             **extra_options,
         }
+        # Bookworm mpv wants options as start=1.5,vf=... not a JSON object.
         self._send(
             [
                 LOADFILE_COMMAND,
                 filename,
                 LOADFILE_REPLACE_FLAG,
                 LOADFILE_REPLACE_INDEX,
-                options,
+                _loadfile_options_argument(options),
             ]
         )
 
@@ -365,6 +368,12 @@ class MpvIpcPlayer:
 
     def _send(self, command: list[object] | dict[str, object]) -> Mapping[str, object]:
         return self._send_command({"command": command})
+
+
+def _loadfile_options_argument(options: Mapping[str, object]) -> str:
+    return LOADFILE_OPTIONS_SEPARATOR.join(
+        f"{key}{LOADFILE_OPTION_ASSIGN}{value}" for key, value in options.items()
+    )
 
 
 def ass_bgr_from_hex(hex_color: str) -> str:

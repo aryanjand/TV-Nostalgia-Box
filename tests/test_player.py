@@ -362,7 +362,7 @@ def test_mpv_load_sends_loadfile_with_start_offset() -> None:
             LITTLE_BEAR_FILENAME,
             "replace",
             -1,
-            {"start": 17.5},
+            "start=17.5",
         ]
     ]
 
@@ -437,13 +437,13 @@ def test_mpv_fade_and_tune_send_different_commands() -> None:
     tune_load = _commands_named(tune_payloads, "loadfile")[0]
     fade_options = fade_load[4]
     tune_options = tune_load[4]
-    assert isinstance(fade_options, dict)
-    assert isinstance(tune_options, dict)
-    assert fade_options["start"] == 0.0
-    assert "fade=t=in:st=0:d=1.5" in str(fade_options["vf"])
-    assert "afade=t=in:st=0:d=1.5" in str(fade_options["af"])
-    assert tune_options == {"start": 8.25}
-    assert "vf" not in tune_options
+    assert isinstance(fade_options, str)
+    assert isinstance(tune_options, str)
+    assert "start=0.0" in fade_options
+    assert "fade=t=in:st=0:d=1.5" in fade_options
+    assert "afade=t=in:st=0:d=1.5" in fade_options
+    assert tune_options == "start=8.25"
+    assert "vf=" not in tune_options
     overlays = _overlay_commands(tune_payloads)
     shown = [overlay for overlay in overlays if overlay.get("format") == "ass-events"]
     removed = [
