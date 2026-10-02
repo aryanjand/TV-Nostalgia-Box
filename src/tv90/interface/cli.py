@@ -10,6 +10,7 @@ from datetime import date
 from pathlib import Path
 from typing import NoReturn, TextIO
 
+from tv90.adapters.enriched_metadata import WikipediaEnrichedMetadataSource
 from tv90.adapters.ffprobe_prober import build_ffprobe_media_prober
 from tv90.adapters.file_duration_index import FileDurationIndex, write_duration_index
 from tv90.adapters.filesystem_library import (
@@ -20,7 +21,9 @@ from tv90.adapters.tvmaze_metadata import (
     METADATA_CACHE_FILENAME,
     EpisodeMetadataFetchError,
     build_tvmaze_metadata_source,
+    urlopen_http_get,
 )
+from tv90.adapters.wikipedia_plots import WikipediaPlotIndex
 from tv90.application.indexing import index_library_durations
 from tv90.application.simulate import (
     DURATION_INDEX_FILENAME,
@@ -250,11 +253,18 @@ def _tag_inputs(
 ]:
     resolved_library = _resolve_library_directory(library_directory)
     library = FilesystemLibrarySource(resolved_library)
-    source = metadata_source or build_tvmaze_metadata_source(
-        resolved_library / METADATA_CACHE_FILENAME,
-        writable=writable,
-        http_get=http_get,
-    )
+    if metadata_source is not None:
+        source: EpisodeMetadataSource = metadata_source
+    else:
+        getter = urlopen_http_get if http_get is None else http_get
+        source = WikipediaEnrichedMetadataSource(
+            build_tvmaze_metadata_source(
+                resolved_library / METADATA_CACHE_FILENAME,
+                writable=writable,
+                http_get=getter,
+            ),
+            WikipediaPlotIndex(getter),
+        )
     return resolved_library, library.episodes(), source, packaged_keyword_rules()
 
 

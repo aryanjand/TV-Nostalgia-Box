@@ -208,7 +208,9 @@ def _title_and_description(
     except EpisodeMetadataNotFoundError:
         not_found.append(episode.filename)
         return None, ""
-    return metadata.title, metadata.description
+    return metadata.title, _filled_description(
+        metadata_source, episode.show_stem, metadata.title, metadata.description
+    )
 
 
 def _paired_title_and_description(
@@ -228,14 +230,35 @@ def _paired_title_and_description(
             continue
     if parts:
         joined = join_short_metadata(parts)
-        return joined.title, joined.description
+        return joined.title, _filled_description(
+            metadata_source, episode.show_stem, joined.title, joined.description
+        )
     fallback = fallback_broadcast_title(
         episode.show_stem, season_number, episode_number
     )
     if fallback is not None:
-        return fallback, ""
+        return fallback, _filled_description(
+            metadata_source, episode.show_stem, fallback, ""
+        )
     not_found.append(episode.filename)
     return None, ""
+
+
+def _filled_description(
+    metadata_source: EpisodeMetadataSource,
+    show_stem: str,
+    title: str,
+    description: str,
+) -> str:
+    if description:
+        return description
+    filler = getattr(metadata_source, "description_for_title", None)
+    if filler is None:
+        return ""
+    filled = filler(show_stem, title)
+    if isinstance(filled, str):
+        return filled
+    return ""
 
 
 def _format_proposed_tags(tags: tuple[str, ...]) -> str:
