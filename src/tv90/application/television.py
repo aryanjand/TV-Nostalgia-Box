@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Protocol
@@ -69,6 +69,7 @@ class PlayKind(Enum):
 class ControllerMode(Enum):
     WAITING_FOR_CLOCK = "waiting_for_clock"
     PLAYING = "playing"
+    IDLE = "idle"
     SLATE = "slate"
     PRE_SIGN_ON = "pre_sign_on"
     NIGHT_LOCK = "night_lock"
@@ -115,7 +116,8 @@ class TelevisionController:
         if self._mode is ControllerMode.NIGHT_LOCK:
             return NOW_PLAYING_OFF_AIR
         if (
-            self._mode is ControllerMode.SLATE
+            self._mode is ControllerMode.IDLE
+            or self._mode is ControllerMode.SLATE
             or self._mode is ControllerMode.PRE_SIGN_ON
             or self._current_filename is None
         ):
@@ -135,24 +137,10 @@ class TelevisionController:
         return volume_bar_segments(self._volume)
 
     def channel_up(self) -> None:
-        if not self._accepts_remote_commands():
-            return
-        if not self._command_cooldown_elapsed():
-            return
-        on_date = self._collaborators.clock.now().date()
-        self._channel_number = self._lineup.channel_up(self._channel_number, on_date)
-        self._tune_to_live_airing()
-        self._mark_command()
+        self._handle_channel_button(self._lineup.channel_up)
 
     def channel_down(self) -> None:
-        if not self._accepts_remote_commands():
-            return
-        if not self._command_cooldown_elapsed():
-            return
-        on_date = self._collaborators.clock.now().date()
-        self._channel_number = self._lineup.channel_down(self._channel_number, on_date)
-        self._tune_to_live_airing()
-        self._mark_command()
+        self._handle_channel_button(self._lineup.channel_down)
 
     def volume_up(self) -> None:
         self._adjust_volume(VOLUME_STEP)
@@ -182,26 +170,26 @@ class TelevisionController:
         if not broadcast_day_contains(clock_hour, self._collaborators.settings):
             self._hold_outside_broadcast_day(clock_hour)
             return
-        if self._mode is ControllerMode.NIGHT_LOCK:
-            self._collaborators.tv_power.power_on()
-            self._power_on_sync()
+        if self._mode is ControllerMode.IDLE:
             return
-        if self._mode is ControllerMode.PRE_SIGN_ON:
-            self._collaborators.tv_power.power_on()
-            self._power_on_sync()
-            return
-        if self._mode is ControllerMode.WAITING_FOR_CLOCK:
-            self._power_on_sync()
+        if (
+            self._mode is ControllerMode.NIGHT_LOCK
+            or self._mode is ControllerMode.PRE_SIGN_ON
+            or self._mode is ControllerMode.WAITING_FOR_CLOCK
+        ):
+            self._enter_idle()
             return
         on_date = self._collaborators.clock.now().date()
         coerced = self._lineup.coerce_current_channel(self._channel_number, on_date)
         if coerced != self._channel_number:
             self._channel_number = coerced
-            self._tune_to_live_airing()
+            if self._mode is ControllerMode.PLAYING:
+                self._tune_to_live_airing()
             return
         if self._awaiting_trust_retune and self._collaborators.clock.is_trusted():
             self._awaiting_trust_retune = False
-            self._tune_to_live_airing()
+            if self._mode is ControllerMode.PLAYING:
+                self._tune_to_live_airing()
             return
         if (
             self._mode is ControllerMode.PLAYING
@@ -243,13 +231,30 @@ class TelevisionController:
         self._current_filename = None
 
     def _enter_night_lock(self) -> None:
-        self._collaborators.tv_power.standby()
         self._collaborators.player.show_slate()
         self._mode = ControllerMode.NIGHT_LOCK
         self._current_filename = None
         self._awaiting_trust_retune = False
 
-    def _power_on_sync(self) -> None:
+    def _enter_idle(self) -> None:
+        self._collaborators.player.show_slate()
+        self._mode = ControllerMode.IDLE
+        self._current_filename = None
+
+    def _handle_channel_button(self, neighbor: Callable[[int, date], int]) -> None:
+        if not self._accepts_remote_commands():
+            return
+        if not self._command_cooldown_elapsed():
+            return
+        if self._mode is ControllerMode.IDLE:
+            self._wake_current_channel()
+        else:
+            on_date = self._collaborators.clock.now().date()
+            self._channel_number = neighbor(self._channel_number, on_date)
+            self._tune_to_live_airing()
+        self._mark_command()
+
+    def _wake_current_channel(self) -> None:
         self._volume = self._collaborators.settings.volume_default
         self._collaborators.player.set_volume(self._volume)
         self._awaiting_trust_retune = not self._collaborators.clock.is_trusted()

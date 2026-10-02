@@ -6,11 +6,11 @@ This is the household guide. You do not need to read the code.
 
 This is a small television, not YouTube.
 
-Plug it in and a show is already on. There is no menu, no search, no “Up Next,” and no list of episodes to pick. The toddler’s only choices are TV on or TV off. A parent phone on the home Wi-Fi can change channel and volume. That is all.
+Plug it in and the box sits on a calm slate. The parent turns the TV on themselves. There is no menu, no search, no “Up Next,” and no list of episodes to pick. A parent phone on the home Wi-Fi can change channel and volume. That is all.
 
 Three friends live on three channels: Little Bear on CH 01, Oswald on CH 02, Harry and His Bucket Full of Dinosaurs on CH 03. A fourth channel appears only around a holiday, with a small set of holiday movies. Shows never come from the internet. If the Wi-Fi is down, the picture still plays from the files on the box.
 
-Mornings tend to be morning-tagged episodes, evenings night-tagged, midday ordinary ones. After 9:00 PM the set goes to standby until morning sign-on (6:30 AM unless you change it). Pulling the power plug is how you turn it off. That is on purpose.
+Mornings tend to be morning-tagged episodes, evenings night-tagged, midday ordinary ones. After 9:00 PM the box goes off-air (calm slate) until morning sign-on (6:30 AM unless you change it). The TV itself is not put on standby; you turn the set on and off. Pulling the power plug is how you turn the box off. That is on purpose.
 
 ## First install on the Pi
 
@@ -97,7 +97,7 @@ These names are the household knobs. Put them on the TV service only while you a
 | --- | --- | --- | --- |
 | Clock and holiday dates follow your civil time | `TV90_TIMEZONE` | `America/Vancouver` | `America/Vancouver` |
 | Morning sign-on | `TV90_SIGN_ON` | `6.5` is 6:30 AM; `7` is 7:00 AM | `6.5` |
-| Night lock (TV standby) | `TV90_NIGHT_LOCK` | `21.0` is 9:00 PM; `20.5` is 8:30 PM | `21.0` |
+| Night lock (box off-air) | `TV90_NIGHT_LOCK` | `21.0` is 9:00 PM; `20.5` is 8:30 PM | `21.0` |
 | How many days before a holiday CH 04 appears | `TV90_HOLIDAY_LEAD_DAYS` | `3` | `3` |
 | Turn a holiday on or off | `TV90_HOLIDAY_HALLOWEEN`, `TV90_HOLIDAY_THANKSGIVING`, `TV90_HOLIDAY_CHRISTMAS`, `TV90_HOLIDAY_EASTER` | `1` / `ON` enable; `0` / `OFF` disable | enabled if you omit the line |
 
@@ -121,13 +121,13 @@ You should see channel headers and clock times with filenames. You should not se
 
 ## Manual checks that can only be done on the real Pi and TV
 
-Do these after first install, and again after a big library change. A laptop cannot stand in for HDMI, CEC, overlay, or a pulled plug.
+Do these after first install, and again after a big library change. A laptop cannot stand in for HDMI, overlay, or a pulled plug.
 
-1. **Power-on kiosk.** Apply power. No desktop, no mouse cursor, no login prompt. After a short wait for the clock, the stream appears fullscreen.
+1. **Power-on kiosk.** Apply power. No desktop, no mouse cursor, no login prompt. After a short wait for the clock, the box holds a calm slate. CHANNEL UP or CHANNEL DOWN on the phone remote starts the current channel.
 2. **Web remote.** On a phone on the same Wi-Fi, open `http://90stv.local:5000`. You should see Now Playing and four buttons: channel up, channel down, volume up, volume down. No episode list.
 3. **Channel and volume on the real TV.** Use the phone remote. The TV OSD shows `CH 01` (and so on) for a few seconds, and a segmented volume bar when you change volume. Channel-up visits 01 → 02 → 03 → (04 only in a holiday window) → 01.
-4. **HDMI-CEC bedtime.** At 9:00 PM local (or your night lock), the television goes to standby. Buttons do nothing until morning sign-on. At sign-on the set comes back and live TV continues.
-5. **Pull-the-plug.** While something is playing, yank the USB-C power, wait a few seconds, plug it back in. The box returns to live TV for whatever the wall clock says that channel should be airing (mid-episode is correct; starting the file over is wrong). The card is not corrupted. The TV does not show write errors, a desktop, or a stack trace.
+4. **Night lock.** At 9:00 PM local (or your night lock), the box goes off-air (slate). Buttons do nothing until morning sign-on. The television is not put on standby. At sign-on the box waits on the slate until CHANNEL UP or CHANNEL DOWN.
+5. **Pull-the-plug.** While something is playing, yank the USB-C power, wait a few seconds, plug it back in. The box returns to the calm slate until CHANNEL UP or CHANNEL DOWN; then live TV for whatever the wall clock says that channel should be airing (mid-episode is correct; starting the file over is wrong). The card is not corrupted. The TV does not show write errors, a desktop, or a stack trace.
 6. **Unplug the network.** Unplug ethernet / turn off Wi-Fi. The TV still plays the local library. The phone remote may disappear until the LAN returns. If the clock was not synced, Now Playing may show `clock not synced`, then retune when time sync comes back.
 7. **Overlay / read-only.** In **tv mode**, create a throw-away file on the system disk (not in the library). Reboot. That file should be gone. Library episodes are still there.
 8. **Maintenance add-one-file.** `sudo tv90-maintenance on`, copy one new episode into `/srv/90stv/library` with `sudo`, dry-run tag, `--apply`, index (all with `sudo` as above), `sudo tv90-maintenance off`. After reboot the new episode is eligible to air (confirm with the simulator for today, or wait until that channel picks it).
@@ -167,7 +167,7 @@ README sections 2–5 and the three README overrides. “Test” means automated
 | **§5 No physical toddler remote** | Design + Manual 2 (parent phone only) |
 | **§5 Input debouncing (500 ms)** | `tests/test_television.py` |
 | **§5 Hardware audio ceiling** | `tests/test_television.py`, `tests/test_config.py`; Manual 3 |
-| **§5 HDMI-CEC sleep scheduling** | `tests/test_tv_power.py`, `tests/test_television.py`; Manual 4 |
+| **§5 HDMI-CEC sleep scheduling** | Not used. Production is `NullTvPower`; night lock is off-air slate. `tests/test_tv_power.py`, `tests/test_television.py`; Manual 4 |
 | **Override 1 — Internet allowed, never for content** | `tests/test_setup_script.py` (no outbound firewall; NTP enabled), `tests/test_television.py` (controller does not import metadata); Manual 6 |
 | **Override 2 — Survive a pulled plug** | `tests/test_end_to_end.py` (no runtime writes), `tests/test_setup_script.py`, `tests/test_maintenance.py`; Manual 5, 7 |
 | **Override 3 — Episode tags generated by a tool** | `tests/test_tagging.py`, `tests/test_keyword_tags.py`, `tests/test_cli.py`; Manual 8 |

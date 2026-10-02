@@ -13,7 +13,7 @@ JOURNALD_DROPIN = (REPO / "packaging" / "90stv-volatile.conf").read_text(
     encoding="utf-8"
 )
 
-REQUIRED_PACKAGES = ("mpv", "ffmpeg", "cec-utils", "avahi-daemon")
+REQUIRED_PACKAGES = ("mpv", "ffmpeg", "avahi-daemon")
 DEFAULT_DENY_MARKERS = (
     "iptables -P OUTPUT DROP",
     "iptables -P OUTPUT DENY",

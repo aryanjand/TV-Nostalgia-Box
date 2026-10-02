@@ -16,7 +16,7 @@ from tv90.adapters.fake_player import (
     ShowVolumeBarCommand,
     TunerChangeCommand,
 )
-from tv90.adapters.fake_tv_power import FakeTvPower, PowerOnCommand, StandbyCommand
+from tv90.adapters.fake_tv_power import FakeTvPower
 from tv90.application.duration_lookup import DurationLookup
 from tv90.application.television import (
     HDMI_LOAD_RETRY_COUNT,
@@ -228,6 +228,11 @@ def _controller(
     return controller, resolved_clock, resolved_player, resolved_power
 
 
+def _wake(controller: TelevisionController) -> None:
+    controller.tick()
+    controller.channel_up()
+
+
 def _load_commands(player: FakePlayer) -> tuple[LoadCommand, ...]:
     return tuple(
         command for command in player.commands if isinstance(command, LoadCommand)
@@ -277,6 +282,12 @@ def test_untrusted_clock_starts_playback_after_timeout_with_unsynced_phrase(
     clock.advance_time(timedelta(seconds=DEFAULT_CLOCK_TRUST_TIMEOUT_SECONDS))
     controller.tick()
 
+    assert player.showing_slate is True
+    assert controller.now_playing() == NOW_PLAYING_SLATE
+    assert _load_commands(player) == ()
+
+    controller.channel_up()
+
     expected = _airing_at(clock.now())
     loads = _load_commands(player)
     assert loads
@@ -287,12 +298,29 @@ def test_untrusted_clock_starts_playback_after_timeout_with_unsynced_phrase(
     assert expected.episode.filename in controller.now_playing()
 
 
-def test_mark_trusted_retunes_and_drops_unsynced_phrase(tmp_path: Path) -> None:
+def test_mark_trusted_while_idle_stays_idle(tmp_path: Path) -> None:
     clock = FakeClock.untrusted(JULY_MORNING)
     controller, _, player, _ = _controller(tmp_path, clock=clock)
     controller.tick()
     clock.advance_time(timedelta(seconds=DEFAULT_CLOCK_TRUST_TIMEOUT_SECONDS))
     controller.tick()
+
+    clock.mark_trusted()
+    controller.tick()
+
+    assert controller.now_playing() == NOW_PLAYING_SLATE
+    assert _load_commands(player) == ()
+    assert _tune_commands(player) == ()
+
+
+def test_mark_trusted_while_playing_retunes_and_drops_unsynced_phrase(
+    tmp_path: Path,
+) -> None:
+    clock = FakeClock.untrusted(JULY_MORNING)
+    controller, _, player, _ = _controller(tmp_path, clock=clock)
+    controller.tick()
+    clock.advance_time(timedelta(seconds=DEFAULT_CLOCK_TRUST_TIMEOUT_SECONDS))
+    _wake(controller)
 
     clock.mark_trusted()
     controller.tick()
@@ -307,12 +335,23 @@ def test_mark_trusted_retunes_and_drops_unsynced_phrase(tmp_path: Path) -> None:
     assert controller.now_playing() == f"{banner} {expected.episode.filename}"
 
 
-def test_trusted_power_on_loads_mid_episode_offset_and_resets_volume(
+def test_trusted_tick_stays_idle_until_channel_wake(tmp_path: Path) -> None:
+    controller, _, player, power = _controller(tmp_path)
+
+    controller.tick()
+
+    assert player.showing_slate is True
+    assert controller.now_playing() == NOW_PLAYING_SLATE
+    assert _load_commands(player) == ()
+    assert power.commands == ()
+
+
+def test_channel_wake_from_idle_loads_mid_episode_offset_and_resets_volume(
     tmp_path: Path,
 ) -> None:
     controller, _, player, power = _controller(tmp_path)
 
-    controller.tick()
+    _wake(controller)
 
     expected = _airing_at(JULY_MORNING)
     loads = _load_commands(player)
@@ -334,7 +373,8 @@ def test_trusted_power_on_loads_mid_episode_offset_and_resets_volume(
 
 def test_channel_up_uses_tune_to_not_fade(tmp_path: Path) -> None:
     controller, clock, player, _ = _controller(tmp_path)
-    controller.tick()
+    _wake(controller)
+    clock.advance_time(COOLDOWN)
 
     controller.channel_up()
 
@@ -357,8 +397,9 @@ def test_channel_up_uses_tune_to_not_fade(tmp_path: Path) -> None:
 
 
 def test_channel_down_wraps_to_harry(tmp_path: Path) -> None:
-    controller, _, player, _ = _controller(tmp_path)
-    controller.tick()
+    controller, clock, player, _ = _controller(tmp_path)
+    _wake(controller)
+    clock.advance_time(COOLDOWN)
 
     controller.channel_down()
 
@@ -372,7 +413,8 @@ def test_channel_down_wraps_to_harry(tmp_path: Path) -> None:
 
 def test_channel_up_inside_cooldown_is_dropped(tmp_path: Path) -> None:
     controller, clock, player, _ = _controller(tmp_path)
-    controller.tick()
+    _wake(controller)
+    clock.advance_time(COOLDOWN)
     controller.channel_up()
     first_tune_count = len(_tune_commands(player))
 
@@ -401,13 +443,15 @@ def test_volume_never_exceeds_ceiling_and_shows_bar(tmp_path: Path) -> None:
     assert controller.volume_segments().count(True) == round(
         VOLUME_CEILING * VOLUME_BAR_SEGMENT_COUNT
     )
+    assert _load_commands(player) == ()
 
 
 def test_volume_down_clamps_to_zero(tmp_path: Path) -> None:
     controller, clock, player, _ = _controller(tmp_path)
     controller.tick()
 
-    for _ in range(12):
+    steps_to_zero = round(VOLUME_DEFAULT / VOLUME_STEP)
+    for _ in range(steps_to_zero + 2):
         clock.advance_time(COOLDOWN)
         controller.volume_down()
 
@@ -432,7 +476,7 @@ def test_volume_command_inside_cooldown_is_dropped(tmp_path: Path) -> None:
 def test_end_of_file_join_uses_fade_to_next_not_tune(tmp_path: Path) -> None:
     clock = FakeClock.trusted(JULY_SIGN_ON)
     controller, _, player, _ = _controller(tmp_path, clock=clock)
-    controller.tick()
+    _wake(controller)
     first_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[0]
     second_slot = _little_bear_timeline(JULY_SIGN_ON.date()).slots[1]
     assert _load_commands(player)[-1].filename == first_slot.episode.filename
@@ -452,7 +496,7 @@ def test_end_of_file_join_uses_fade_to_next_not_tune(tmp_path: Path) -> None:
 def test_lagged_join_uses_wall_clock_offset(tmp_path: Path) -> None:
     clock = FakeClock.trusted(JULY_SIGN_ON)
     controller, _, player, _ = _controller(tmp_path, clock=clock)
-    controller.tick()
+    _wake(controller)
     player.mark_playback_ended()
     clock.advance_time(timedelta(hours=1, minutes=30))
     controller.tick()
@@ -466,7 +510,7 @@ def test_lagged_join_uses_wall_clock_offset(tmp_path: Path) -> None:
 def test_early_eof_skips_to_next_slot_with_fade(tmp_path: Path) -> None:
     clock = FakeClock.trusted(JULY_MORNING)
     controller, _, player, _ = _controller(tmp_path, clock=clock)
-    controller.tick()
+    _wake(controller)
     covering = _airing_at(JULY_MORNING)
     later_slots = [
         slot
@@ -481,19 +525,20 @@ def test_early_eof_skips_to_next_slot_with_fade(tmp_path: Path) -> None:
     assert fades[-1].offset_seconds == pytest.approx(0.0)
 
 
-def test_night_lock_standby_ignores_inputs_sign_on_powers_on(
+def test_night_lock_ignores_inputs_morning_stays_idle_until_wake(
     tmp_path: Path,
 ) -> None:
     clock = FakeClock.trusted(JULY_MORNING)
     controller, _, player, power = _controller(tmp_path, clock=clock)
-    controller.tick()
+    _wake(controller)
+    loads_after_wake = _load_commands(player)
 
     clock.advance_time(JULY_NIGHT_LOCK - JULY_MORNING)
     controller.tick()
     controller.channel_up()
     controller.volume_up()
 
-    assert power.commands[-1] == StandbyCommand()
+    assert power.commands == ()
     assert player.showing_slate is True
     assert controller.now_playing() == NOW_PLAYING_OFF_AIR
     assert _tune_commands(player) == ()
@@ -501,7 +546,14 @@ def test_night_lock_standby_ignores_inputs_sign_on_powers_on(
     clock.advance_time(NEXT_SIGN_ON - JULY_NIGHT_LOCK)
     controller.tick()
 
-    assert PowerOnCommand() in power.commands
+    assert power.commands == ()
+    assert controller.now_playing() == NOW_PLAYING_SLATE
+    assert _load_commands(player) == loads_after_wake
+    assert player.showing_slate is True
+
+    controller.channel_up()
+
+    assert power.commands == ()
     loads = _load_commands(player)
     assert loads[-1].offset_seconds == pytest.approx(0.0)
     assert player.volume == VOLUME_DEFAULT
@@ -511,14 +563,15 @@ def test_night_lock_standby_ignores_inputs_sign_on_powers_on(
 def test_episode_is_cut_off_at_night_lock_without_fade(tmp_path: Path) -> None:
     clock = FakeClock.trusted(JULY_NIGHT_LOCK - timedelta(minutes=1))
     controller, _, player, power = _controller(tmp_path, clock=clock)
-    controller.tick()
+    _wake(controller)
     player.mark_playback_ended()
     clock.advance_time(timedelta(minutes=1))
     controller.tick()
 
-    assert power.commands == (StandbyCommand(),)
+    assert power.commands == ()
     assert _fade_commands(player) == ()
     assert player.showing_slate is True
+    assert controller.now_playing() == NOW_PLAYING_OFF_AIR
 
 
 def test_empty_library_shows_slate(tmp_path: Path) -> None:
@@ -532,19 +585,28 @@ def test_empty_library_shows_slate(tmp_path: Path) -> None:
     assert controller.now_playing() == NOW_PLAYING_SLATE
     assert _load_commands(player) == ()
 
+    controller.channel_up()
+
+    assert player.showing_slate is True
+    assert controller.now_playing() == NOW_PLAYING_SLATE
+    assert _load_commands(player) == ()
+
 
 def test_missing_duration_skips_file_and_plays_other_channel(tmp_path: Path) -> None:
     durations = {
         OSWALD_ONE.filename: ONE_HOUR_SECONDS,
         HARRY_ONE.filename: ONE_HOUR_SECONDS,
     }
-    controller, _, player, _ = _controller(
+    controller, clock, player, _ = _controller(
         tmp_path,
         duration_index=FakeDurationIndex(durations),
     )
     controller.tick()
     assert player.showing_slate is True
 
+    controller.channel_up()
+    assert player.showing_slate is True
+    clock.advance_time(COOLDOWN)
     controller.channel_up()
     assert player.current_filename == OSWALD_ONE.filename
     assert _tune_commands(player)
@@ -560,7 +622,7 @@ def test_corrupt_duration_is_skipped_not_fatal(tmp_path: Path) -> None:
     controller, _, player, _ = _controller(
         tmp_path, duration_index=FakeDurationIndex(durations)
     )
-    controller.tick()
+    _wake(controller)
 
     loads = _load_commands(player)
     assert loads
@@ -573,7 +635,7 @@ def test_player_error_skips_to_next_slot_without_exiting(tmp_path: Path) -> None
     player = FailListedPlayer(settings, frozenset({covering.episode.filename}))
     controller, _, _, _ = _controller(tmp_path, player=player)
 
-    controller.tick()
+    _wake(controller)
 
     later_slots = [
         slot
@@ -592,7 +654,7 @@ def test_all_player_errors_hold_slate(tmp_path: Path) -> None:
     player = FailListedPlayer(settings, failing)
     controller, _, _, _ = _controller(tmp_path, player=player)
 
-    controller.tick()
+    _wake(controller)
 
     assert player.showing_slate is True
     assert controller.now_playing() == NOW_PLAYING_SLATE
@@ -604,7 +666,7 @@ def test_hdmi_retry_then_plays(tmp_path: Path) -> None:
     player = FlakyLoadPlayer(settings, failures_before_success=HDMI_LOAD_RETRY_COUNT)
     controller, _, _, _ = _controller(tmp_path, player=player, wait=wait)
 
-    controller.tick()
+    _wake(controller)
 
     assert _load_commands(player)
     assert wait.calls == [HDMI_RETRY_WAIT_SECONDS] * HDMI_LOAD_RETRY_COUNT
@@ -617,7 +679,7 @@ def test_hdmi_retries_then_skips_file(tmp_path: Path) -> None:
     player = FailListedPlayer(settings, frozenset({covering.episode.filename}))
     controller, _, _, _ = _controller(tmp_path, player=player, wait=wait)
 
-    controller.tick()
+    _wake(controller)
 
     later_slots = [
         slot
@@ -636,11 +698,14 @@ def test_duration_lookup_probe_failure_skips(tmp_path: Path) -> None:
         FailingProber(),
     )
     library = FakeLibrarySource(episodes=(LITTLE_BEAR_ONE, OSWALD_ONE, HARRY_ONE))
-    controller, _, player, _ = _controller(
+    controller, clock, player, _ = _controller(
         tmp_path, library=library, duration_index=lookup
     )
     controller.tick()
     assert player.showing_slate is True
+    controller.channel_up()
+    assert player.showing_slate is True
+    clock.advance_time(COOLDOWN)
     controller.channel_up()
     assert player.current_filename == OSWALD_ONE.filename
 
@@ -691,7 +756,13 @@ def test_commands_ignored_before_sign_on(tmp_path: Path) -> None:
     clock.advance_time(JULY_SIGN_ON - JULY_BEFORE_SIGN_ON)
     controller.tick()
 
-    assert PowerOnCommand() in power.commands
+    assert power.commands == ()
+    assert controller.now_playing() == NOW_PLAYING_SLATE
+    assert _load_commands(player) == ()
+
+    controller.channel_up()
+
+    assert power.commands == ()
     assert _load_commands(player)
 
 
@@ -708,7 +779,8 @@ def test_stale_channel_four_is_coerced_after_window_closes(tmp_path: Path) -> No
         library=FakeLibrarySource(episodes=halloween_library),
         duration_index=FakeDurationIndex(durations),
     )
-    controller.tick()
+    _wake(controller)
+    clock.advance_time(COOLDOWN)
     controller.channel_up()
     clock.advance_time(COOLDOWN)
     controller.channel_up()
@@ -718,10 +790,15 @@ def test_stale_channel_four_is_coerced_after_window_closes(tmp_path: Path) -> No
 
     clock.advance_time(HALLOWEEN_NIGHT_LOCK - clock.now())
     controller.tick()
-    assert StandbyCommand() in power.commands
+    assert power.commands == ()
+    assert controller.now_playing() == NOW_PLAYING_OFF_AIR
 
     clock.advance_time(NOVEMBER_SIGN_ON - clock.now())
     controller.tick()
+
+    assert power.commands == ()
+    assert controller.now_playing() == NOW_PLAYING_SLATE
+    controller.channel_up()
 
     expected = _airing_at(NOVEMBER_SIGN_ON)
     loads = _load_commands(player)
@@ -736,10 +813,10 @@ def test_no_runtime_writes_over_a_simulated_day(tmp_path: Path) -> None:
     marker.chmod(0o444)
     library_root.chmod(0o555)
     clock = FakeClock.trusted(JULY_SIGN_ON)
+    controller, _, _, power = _controller(
+        tmp_path, clock=clock, library_root=library_root
+    )
     try:
-        controller, _, _, _ = _controller(
-            tmp_path, clock=clock, library_root=library_root
-        )
         end = JULY_NIGHT_LOCK + timedelta(hours=1)
         while clock.now() <= end:
             controller.tick()
@@ -750,6 +827,7 @@ def test_no_runtime_writes_over_a_simulated_day(tmp_path: Path) -> None:
 
     assert marker.read_text(encoding="utf-8") == "read-only mount"
     assert list(library_root.iterdir()) == [marker]
+    assert power.commands == ()
 
 
 def test_run_loops_tick_and_injected_wait(tmp_path: Path) -> None:
@@ -761,7 +839,8 @@ def test_run_loops_tick_and_injected_wait(tmp_path: Path) -> None:
 
     assert wait.calls == 2
     assert wait.last_seconds == TICK_INTERVAL_SECONDS
-    assert _load_commands(player)
+    assert _load_commands(player) == ()
+    assert controller.now_playing() == NOW_PLAYING_SLATE
 
 
 def test_volume_and_channel_ignored_during_untrusted_wait(tmp_path: Path) -> None:
@@ -801,7 +880,8 @@ def test_shared_cooldown_drops_volume_after_channel(tmp_path: Path) -> None:
 
 def test_channel_down_inside_cooldown_is_dropped(tmp_path: Path) -> None:
     controller, clock, player, _ = _controller(tmp_path)
-    controller.tick()
+    _wake(controller)
+    clock.advance_time(COOLDOWN)
     controller.channel_down()
     first_tune_count = len(_tune_commands(player))
 
@@ -819,7 +899,8 @@ def test_channel_change_to_empty_friend_holds_slate(tmp_path: Path) -> None:
     controller, clock, player, _ = _controller(
         tmp_path, duration_index=FakeDurationIndex(durations)
     )
-    controller.tick()
+    _wake(controller)
+    clock.advance_time(COOLDOWN)
     controller.channel_up()
     assert player.current_filename == OSWALD_ONE.filename
 
@@ -845,7 +926,8 @@ def test_stale_channel_four_is_coerced_while_playing(tmp_path: Path) -> None:
         library=FakeLibrarySource(episodes=halloween_library),
         duration_index=FakeDurationIndex(durations),
     )
-    controller.tick()
+    _wake(controller)
+    clock.advance_time(COOLDOWN)
     controller.channel_up()
     clock.advance_time(COOLDOWN)
     controller.channel_up()
@@ -873,7 +955,7 @@ def test_early_eof_on_last_slot_holds_slate(tmp_path: Path) -> None:
     )
     clock = FakeClock.trusted(last_start)
     controller, _, player, _ = _controller(tmp_path, clock=clock)
-    controller.tick()
+    _wake(controller)
     player.mark_playback_ended()
     controller.tick()
 

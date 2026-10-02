@@ -13,7 +13,10 @@ from tv90.adapters.fake_library import FakeLibrarySource
 from tv90.adapters.fake_player import FakePlayer, LoadCommand
 from tv90.adapters.fake_tv_power import FakeTvPower
 from tv90.application.simulate import DURATION_INDEX_FILENAME
-from tv90.application.television import TICK_INTERVAL_SECONDS
+from tv90.application.television import (
+    NOW_PLAYING_SLATE,
+    TICK_INTERVAL_SECONDS,
+)
 from tv90.config import DEFAULT_LIBRARY_PATH, load_settings
 from tv90.domain.duration import DurationUnknownError
 from tv90.domain.filename import parse_filename
@@ -72,6 +75,8 @@ def test_build_runtime_with_fakes_now_playing_works() -> None:
 
     assert runtime.controller.now_playing() == "clock not synced"
     runtime.controller.tick()
+    assert runtime.controller.now_playing() == NOW_PLAYING_SLATE
+    runtime.controller.channel_up()
     playing = runtime.controller.now_playing()
     assert playing.startswith(f"{format_channel_banner(1)} LittleBear_")
 
@@ -180,9 +185,11 @@ def test_run_service_ticks_without_binding_flask() -> None:
     worker.start()
     deadline = time.monotonic() + 2.0
     while time.monotonic() < deadline:
-        if runtime.controller.now_playing().startswith("CH 01"):
+        if runtime.controller.now_playing() == NOW_PLAYING_SLATE:
             break
         time.sleep(0.01)
+    assert runtime.controller.now_playing() == NOW_PLAYING_SLATE
+    runtime.controller.channel_up()
     stop.set()
     worker.join(timeout=2.0)
 

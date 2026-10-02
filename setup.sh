@@ -57,8 +57,7 @@ ensure_packages() {
     python3-pip \
     python3.11 \
     avahi-daemon \
-    ffmpeg \
-    cec-utils
+    ffmpeg
 }
 
 ensure_user() {

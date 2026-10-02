@@ -105,11 +105,17 @@ def _controller(
     return controller, resolved_clock, resolved_player
 
 
+def _wake(controller: TelevisionController) -> None:
+    controller.tick()
+    controller.channel_up()
+
+
 def _playing_client(
     tmp_path: Path,
 ) -> tuple[TelevisionController, FakeClock, FakePlayer, FlaskClient]:
     controller, clock, player = _controller(tmp_path)
-    controller.tick()
+    _wake(controller)
+    clock.advance_time(COOLDOWN)
     return controller, clock, player, create_remote_app(controller).test_client()
 
 

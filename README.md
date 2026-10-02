@@ -100,7 +100,7 @@ The scheduler is how the north star becomes code: **which episode of the current
 
   Example: 8:00 AM favors `_MORNING`. 1:00 PM is a **fair lottery** across general episodes (recency $R$ still applies; season/holiday still apply). 8:00 PM favors `_NIGHT`. **Episode dayparting, not show mixing** — Oswald at night is still Oswald.
 
-* **Night lock — 9:00 PM:** Hard stop at **21:00 local**. The engine will not start a new episode at or after 9:00 PM. HDMI-CEC standby (§5) matches this lock. This is the only hard time gate; morning/night Gaussians stay probabilistic.
+* **Night lock — 9:00 PM:** Hard stop at **21:00 local**. The engine will not start a new episode at or after 9:00 PM. The box holds an off-air slate; it does not send HDMI-CEC standby. This is the only hard time gate; morning/night Gaussians stay probabilistic.
 
 * **4-Season Ambient Sync (within each show):** Month → meteorological season (Spring Mar–May, Summer Jun–Aug, Autumn Sep–Nov, Winter Dec–Feb). Current-season tags get ~80% of seasonal weight; season-evergreen fills the rest; wrong-season is down-weighted (snowy Little Bear is rare in July), not deleted. Screen weather should mostly match the trees outside.
 
@@ -124,17 +124,17 @@ The scheduler is how the north star becomes code: **which episode of the current
 
   $$\text{Weight} = W_{\text{time}}(t) \times W_{\text{season}} \times M_{\text{holiday}} \times R$$
 
-* **Station sign-on / sign-off:** Broadcast day e.g. 6:30 AM – **9:00 PM** (night lock). Outside that window the engine does not start another episode; HDMI-CEC standby (§5) owns bedtime. On or off — never an infinite next-up queue.
+* **Station sign-on / sign-off:** Broadcast day e.g. 6:30 AM – **9:00 PM** (night lock). Outside that window the engine does not start another episode; the box holds an off-air slate. Parents turn the TV on themselves. On or off — never an infinite next-up queue.
 
 ---
 
 ### 5. Remote Control, Web UI & Safety Controls
 
 * **LAN-only Flask remote (parent device):** The **only** controller is the embedded Flask page on the home LAN at `http://90stv.local:5000` (or local IP). Large buttons: `CHANNEL UP`, `CHANNEL DOWN`, `VOLUME UP`, `VOLUME DOWN`, and a "Now Playing" line. No episode grid, no search, no thumbnails. Bind to LAN; do not expose the remote to the internet. Network access on the Pi also supports NTP and maintenance (see §2); it is never used to fetch or stream shows.
-* **No physical toddler remote:** No USB air mouse / extra IR clicker on the table. Power and HDMI-CEC bedtime are the toddler-facing on/off boundary.
+* **No physical toddler remote:** No USB air mouse / extra IR clicker on the table. The parent turns the TV on; the phone remote starts the current channel from idle.
 * **Input Debouncing:** Enforces a 500ms command cooldown on the web remote so repeated taps do not race the player.
 * **Hardware Audio Ceiling:** Hard-codes a maximum audio output limit (e.g., 65% ALSA volume) to protect hardware and child hearing.
-* **HDMI-CEC Sleep Scheduling:** Sends HDMI-CEC commands to turn off/standby the television at the **9:00 PM night lock** and ignores inputs until morning sign-on (e.g., 6:30 AM).
+* **Idle until the parent remote:** After the clock is trusted (or the trust timeout), the box stays on a calm slate. CHANNEL UP or CHANNEL DOWN on the phone remote starts the current channel at the wall-clock offset without wrapping. The box does not send HDMI-CEC standby or power-on.
 
 ---
 

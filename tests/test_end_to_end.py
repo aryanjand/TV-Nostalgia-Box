@@ -20,7 +20,7 @@ from tv90.adapters.fake_player import (
     LoadCommand,
     TunerChangeCommand,
 )
-from tv90.adapters.fake_tv_power import FakeTvPower, PowerOnCommand, StandbyCommand
+from tv90.adapters.fake_tv_power import FakeTvPower
 from tv90.adapters.filesystem_library import FilesystemLibrarySource
 from tv90.adapters.tvmaze_metadata import METADATA_CACHE_FILENAME
 from tv90.application.simulate import (
@@ -251,6 +251,11 @@ def _controller(
     return controller, clock, resolved_player, resolved_power, calendar
 
 
+def _wake(controller: TelevisionController) -> None:
+    controller.tick()
+    controller.channel_up()
+
+
 def _join_live(
     controller: TelevisionController,
     clock: FakeClock,
@@ -331,7 +336,7 @@ def test_july_week_cartoon_channels_dayparts_and_show_isolation(
         clock=clock,
         library=FilesystemLibrarySource(library_dir),
     )
-    controller.tick()
+    _wake(controller)
 
     morning_dayparts: list[Daypart] = []
     midday_dayparts: list[Daypart] = []
@@ -399,7 +404,7 @@ def test_halloween_opens_channel_four_with_layer_a_and_holiday_movies(
 ) -> None:
     clock = FakeClock.trusted(_at(HALLOWEEN, 8, 0))
     controller, clock, player, _power, calendar = _controller(tmp_path, clock=clock)
-    controller.tick()
+    _wake(controller)
 
     halloween_cartoon = parse_filename("LittleBear_S01E09_HALLOWEEN.mp4")
     assert calendar.channel_four_open(HALLOWEEN) is True
@@ -449,7 +454,7 @@ def test_day_after_halloween_drops_channel_four_and_coerces_stale(
 ) -> None:
     clock = FakeClock.trusted(_at(HALLOWEEN, 16, 0))
     controller, clock, player, _power, calendar = _controller(tmp_path, clock=clock)
-    controller.tick()
+    _wake(controller)
     wrap = _surf_wrap(controller, clock)
     assert HOLIDAY_CHANNEL_NUMBER in wrap
     clock.advance_time(COOLDOWN)
@@ -473,12 +478,12 @@ def test_day_after_halloween_drops_channel_four_and_coerces_stale(
     )
 
 
-def test_night_lock_standby_survives_midnight_then_morning_sign_on(
+def test_night_lock_off_air_survives_midnight_then_morning_idle_until_wake(
     tmp_path: Path,
 ) -> None:
     clock = FakeClock.trusted(_at(JULY_WEEK_START, 20, 50))
     controller, clock, player, power, _calendar = _controller(tmp_path, clock=clock)
-    controller.tick()
+    _wake(controller)
     assert _require_playing(controller)[0] == LITTLE_BEAR_CHANNEL_NUMBER
 
     _advance_to(clock, _at(JULY_WEEK_START, 21, 0))
@@ -486,8 +491,8 @@ def test_night_lock_standby_survives_midnight_then_morning_sign_on(
     controller.channel_up()
     controller.volume_up()
 
-    assert power.commands[-1] == StandbyCommand()
-    assert power.is_in_standby() is True
+    assert power.commands == ()
+    assert power.is_in_standby() is False
     assert player.showing_slate is True
     assert controller.now_playing() == NOW_PLAYING_OFF_AIR
 
@@ -495,7 +500,7 @@ def test_night_lock_standby_survives_midnight_then_morning_sign_on(
     _advance_to(clock, _at(next_morning, 0, 15))
     controller.tick()
     controller.channel_down()
-    assert power.is_in_standby() is True
+    assert power.commands == ()
     assert controller.now_playing() == NOW_PLAYING_OFF_AIR
 
     _advance_to(clock, _at(next_morning, 5, 0))
@@ -505,8 +510,13 @@ def test_night_lock_standby_survives_midnight_then_morning_sign_on(
     _advance_to(clock, _at(next_morning, 6, 30))
     controller.tick()
 
-    assert PowerOnCommand() in power.commands
-    assert power.is_in_standby() is False
+    assert power.commands == ()
+    assert controller.now_playing() == NOW_PLAYING_SLATE
+    assert player.showing_slate is True
+
+    controller.channel_up()
+
+    assert power.commands == ()
     channel_number, episode = _require_playing(controller)
     assert channel_number == LITTLE_BEAR_CHANNEL_NUMBER
     _assert_show_isolation(channel_number, episode)
@@ -535,6 +545,16 @@ def test_trusted_clock_timeout_then_sync_retunes(tmp_path: Path) -> None:
 
     clock.advance_time(timedelta(seconds=2))
     controller.tick()
+    assert controller.now_playing() == NOW_PLAYING_SLATE
+    assert player.showing_slate is True
+    assert (
+        tuple(
+            command for command in player.commands if isinstance(command, LoadCommand)
+        )
+        == ()
+    )
+
+    controller.channel_up()
     line = controller.now_playing()
     assert NOW_PLAYING_CLOCK_NOT_SYNCED in line
     channel_number, episode = _parse_playing(line)
@@ -564,7 +584,7 @@ def test_yanked_file_fail_soft_controller_keeps_ticking(tmp_path: Path) -> None:
     controller, clock, _, _power, _calendar = _controller(
         tmp_path, clock=clock, player=player, settings=settings
     )
-    controller.tick()
+    _wake(controller)
     _channel, playing = _require_playing(controller)
     assert playing.show_stem == LITTLE_BEAR_SHOW_STEM
 
@@ -598,7 +618,7 @@ def test_yanked_file_fail_soft_controller_keeps_ticking(tmp_path: Path) -> None:
 def test_e2e_web_remote_has_only_four_buttons_and_now_playing(tmp_path: Path) -> None:
     clock = FakeClock.trusted(_at(JULY_WEEK_START, 8, 0))
     controller, _clock, _player, _power, _calendar = _controller(tmp_path, clock=clock)
-    controller.tick()
+    _wake(controller)
     app = create_remote_app(controller)
     client = app.test_client()
 
@@ -625,7 +645,7 @@ def test_e2e_web_remote_has_only_four_buttons_and_now_playing(tmp_path: Path) ->
 def test_e2e_playback_collaborators_have_no_metadata_source(tmp_path: Path) -> None:
     clock = FakeClock.trusted(_at(JULY_WEEK_START, 8, 0))
     controller, clock, player, _power, _calendar = _controller(tmp_path, clock=clock)
-    controller.tick()
+    _wake(controller)
     _join_live(controller, clock, player, _at(JULY_WEEK_START, 13, 0))
     _surf_wrap(controller, clock)
 

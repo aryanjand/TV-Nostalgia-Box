@@ -16,7 +16,6 @@ from pathlib import Path
 
 from flask import Flask
 
-from tv90.adapters.cec_client_tv_power import CecClientTvPower, run_cec_client_command
 from tv90.adapters.ffprobe_prober import build_ffprobe_media_prober
 from tv90.adapters.file_duration_index import FileDurationIndex
 from tv90.adapters.filesystem_library import FilesystemLibrarySource
@@ -25,6 +24,7 @@ from tv90.adapters.mpv_ipc_player import (
     connect_mpv_unix_socket,
     spawn_mpv_process,
 )
+from tv90.adapters.null_tv_power import NullTvPower
 from tv90.adapters.system_clock import build_system_clock
 from tv90.application.duration_lookup import DurationLookup
 from tv90.application.simulate import DURATION_INDEX_FILENAME
@@ -177,14 +177,14 @@ def build_runtime(
 
 
 def build_production_runtime(environ: Mapping[str, str]) -> Runtime:
-    """Real adapters only. Tests never call this (would spawn mpv/cec)."""
+    """Real adapters only. Tests never call this (would spawn mpv)."""
     settings = load_settings(environ)
     library_path = load_library_path(environ)
     return build_runtime(
         environ,
         clock=build_system_clock(settings.timezone),
         player=_build_production_player(settings, library_path),
-        tv_power=CecClientTvPower(run_cec_client_command),
+        tv_power=NullTvPower(),
         library=FilesystemLibrarySource(library_path),
         duration_index=_build_runtime_duration_index(library_path),
         wait=time.sleep,

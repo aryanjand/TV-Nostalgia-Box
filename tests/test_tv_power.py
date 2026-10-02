@@ -13,6 +13,7 @@ from tv90.adapters.cec_client_tv_power import (
     cec_standby_stdin,
 )
 from tv90.adapters.fake_tv_power import FakeTvPower, PowerOnCommand, StandbyCommand
+from tv90.adapters.null_tv_power import NullTvPower
 from tv90.ports import TvPower
 
 
@@ -148,6 +149,33 @@ def test_cec_adapter_does_not_write_disk(tmp_path: Path) -> None:
 
     after = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
     assert after == before
+
+
+def test_null_tv_power_standby_and_power_on_are_no_ops() -> None:
+    power = NullTvPower()
+
+    power.standby()
+    power.power_on()
+    power.standby()
+
+    assert power.is_in_standby() is False
+
+
+def test_null_tv_power_is_never_in_standby() -> None:
+    power = NullTvPower()
+
+    assert power.is_in_standby() is False
+    power.standby()
+    assert power.is_in_standby() is False
+    power.power_on()
+    assert power.is_in_standby() is False
+
+
+def test_null_tv_power_satisfies_tv_power_protocol() -> None:
+    power: TvPower = NullTvPower()
+    power.standby()
+    power.power_on()
+    assert power.is_in_standby() is False
 
 
 def test_fake_and_cec_adapter_satisfy_tv_power_protocol() -> None:
