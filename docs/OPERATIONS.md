@@ -17,14 +17,14 @@ Mornings tend to be morning-tagged episodes, evenings night-tagged, midday ordin
 You need a Raspberry Pi 4, a microSD card, an HDMI cable to the TV, and the official USB-C power supply.
 
 1. Install Raspberry Pi OS Bookworm on the card and boot the Pi once so it can finish first-run setup.
-2. Copy this project onto the Pi.
-3. On the Pi, open a terminal in the project folder and run `setup.sh` as root (`sudo ./setup.sh`). Wait until it prints that setup is complete. The hostname becomes `90stv`. Folders, the TV service, and the maintenance command are installed for you.
-4. Enter maintenance with `sudo tv90-maintenance on` (next section). The words **maintenance mode** print *before* any reboot. After the Pi comes back it will not reprint the mode. Run `sudo tv90-maintenance status` and confirm it says `maintenance mode`.
-5. Copy your episode files into `/srv/90stv/library` with `sudo` (or as the `tv90` user). Keep them in that one folder (no subfolders). Cartoon names look like `LittleBear_S01E04.mp4`. Holiday movies look like `Holiday_Rudolph_CHRISTMAS.mp4`. Channel bumpers do not go in the episode folder. They live under `/srv/90stv/interstitials/ch01` through `ch04` (one folder per channel).
-6. Tag, then index (see “Adding episodes” below). Those commands also need `sudo` (or the `tv90` user).
+2. Copy this project onto the Pi (`git clone` is enough).
+3. On the Pi, open a terminal in the project folder and run `sudo ./setup.sh`. Wait until it finishes. The hostname becomes `90stv`. Folders, the TV service, and the maintenance command are installed. The same command also downloads the three shows (and holiday specials) into `/srv/90stv/library` and generates channel bumpers under `/srv/90stv/interstitials/ch01` through `ch04` — bumpers never go in the episode folder. Downloads take a long time and need the network. If you only want packages and folders, run `sudo ./setup.sh --skip-media`. On a laptop with no sudo, `./setup.sh` installs a local `.venv` and puts files in `downloads/library` and `downloads/interstitials`.
+4. If the script says a reboot is needed for the write-protect overlay, reboot now. After it comes back, `sudo tv90-maintenance status` prints the current mode.
+5. Tagging is optional and is not applied automatically. If you want tags, enter maintenance with `sudo tv90-maintenance on` (next section). The words **maintenance mode** print *before* any reboot. After the Pi comes back it will not reprint the mode. Run `sudo tv90-maintenance status` and confirm it says `maintenance mode`. Setup already ran `tv90 index` when episodes were present; if you skip tagging you can play after the overlay reboot.
+6. In maintenance, dry-run tag then `--apply`, then index again (see “Adding episodes” below). Those commands need `sudo` (or the `tv90` user). Extra files you copy by hand still go in that one library folder: `LittleBear_S01E04.mp4`, `Holiday_Rudolph_CHRISTMAS.mp4`.
 7. Leave maintenance with `sudo tv90-maintenance off`. **tv mode** prints before any reboot; after the Pi comes back it will not reprint the mode. The television should be on: no desktop, the stream on the set. Confirm with `sudo tv90-maintenance status` if you want the printed words.
 
-If the library is still empty, the child should see a calm colored slate, never a desktop or an error dump.
+If the library is still empty, the child should see a calm colored slate, never a desktop or an error dump. Re-running `sudo ./setup.sh` is safe: it skips files that are already the right size, keeps a household-edited `90stv.service`, and only installs missing packages. Use `--repair` to fill missing or corrupt bumpers.
 
 ## How to enter and leave maintenance
 

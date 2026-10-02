@@ -24,7 +24,7 @@ Unlike YouTube or Netflix, this box is not engineered for watch time, click-thro
 
 ### 2. System Architecture & Provisioning
 
-* **Automated Provisioning Script:** A single Bash setup script (`setup.sh`) automates system updates, installs dependencies (`mpv`, `flask`, `avahi-daemon`), assigns the hostname (`90stv`), configures local mDNS discovery, and sets up project folders.
+* **Automated Provisioning Script:** A single Bash setup script (`setup.sh`) automates system updates, installs dependencies (`mpv`, `flask`, `avahi-daemon`), assigns the hostname (`90stv`), configures local mDNS discovery, and sets up project folders. First run (`./setup.sh`, or `sudo ./setup.sh` on the Pi) also fetches the local episode library and channel bumpers; playback itself never uses the network.
 * **Systemd Daemon Service:** The application runs as a background service (`90stv.service`) with `Restart=always` to guarantee immediate startup on power-up and automatic recovery if a process exits unexpectedly.
 * **Headless Kiosk Boot:** The device boots directly into the live television video stream upon receiving power—bypassing user logins, desktop environments, and command-line text to mimic an arcade machine or classic TV set.
 * **Internet for operations, never for content:** Shows never come from the internet. The library is 100% local. Playback never fetches, streams, or depends on anything online. If the internet is down, the TV works exactly the same. The Pi may use the internet for time sync (NTP), for system updates during maintenance, and for fetching episode titles and descriptions during maintenance. Avahi/mDNS stays on the LAN (`90stv.local`). Do not configure an outbound firewall.

@@ -75,6 +75,40 @@ def test_setup_script_is_idempotent_about_fstab_and_units() -> None:
     assert "tv90-apply-library-mount" in SETUP_SCRIPT
 
 
+def test_setup_script_does_not_install_cec_utils() -> None:
+    assert "cec-utils" not in SETUP_SCRIPT
+
+
+def test_setup_script_supports_non_root_and_skip_media() -> None:
+    assert "id -u" in SETUP_SCRIPT
+    assert "must run as root" not in SETUP_SCRIPT
+    assert ".venv" in SETUP_SCRIPT
+    assert "downloads/library" in SETUP_SCRIPT
+    assert "downloads/interstitials" in SETUP_SCRIPT
+    assert "--skip-media" in SETUP_SCRIPT
+
+
+def test_setup_script_fetches_shows_and_interstitials() -> None:
+    assert "download-little-bear" in SETUP_SCRIPT
+    assert "download-oswald" in SETUP_SCRIPT
+    assert "download-harry" in SETUP_SCRIPT
+    assert "download-holiday" in SETUP_SCRIPT
+    assert "download-interstitials" in SETUP_SCRIPT
+    assert "interstitials" in SETUP_SCRIPT
+
+
+def test_setup_script_is_resilient_about_existing_disk_network_health() -> None:
+    assert "skip valid existing files" in SETUP_SCRIPT
+    assert "existing installation detected" in SETUP_SCRIPT
+    assert "--repair" in SETUP_SCRIPT
+    assert "health" in SETUP_SCRIPT
+    assert "disk" in SETUP_SCRIPT
+    assert "network" in SETUP_SCRIPT
+    assert "MIN_FREE_GIB_FULL_LIBRARY" in SETUP_SCRIPT
+    assert "archive.org" in SETUP_SCRIPT
+    assert "apt-get upgrade" not in SETUP_SCRIPT
+
+
 def test_unit_file_restarts_always_and_logs_to_journal() -> None:
     assert "Restart=always" in UNIT_FILE
     assert "After=network-online.target sound.target" in UNIT_FILE
