@@ -28,7 +28,8 @@ MPV_CACHE_PAUSE_FLAG = "--cache-pause=no"
 MPV_CACHE_ON_DISK_FLAG = "--cache-on-disk=no"
 MPV_IDLE_FLAG = "--idle=yes"
 MPV_VO_DRM_FLAG = "--vo=drm"
-MPV_HWDEC_FLAG = "--hwdec=auto-safe"
+MPV_HWDEC_FLAG = "--hwdec=v4l2m2m-copy"
+MPV_FRAMEDROP_FLAG = "--framedrop=vo"
 MPV_MSG_LEVEL_FLAG = "--msg-level=all=error"
 MPV_FORCE_WINDOW_FLAG = "--force-window=yes"
 MPV_FULLSCREEN_FLAG = "--fullscreen"
@@ -398,6 +399,7 @@ def mpv_spawn_arguments(socket_path: str, settings: Settings) -> tuple[str, ...]
         MPV_IDLE_FLAG,
         MPV_VO_DRM_FLAG,
         MPV_HWDEC_FLAG,
+        MPV_FRAMEDROP_FLAG,
         MPV_MSG_LEVEL_FLAG,
         MPV_FORCE_WINDOW_FLAG,
         MPV_FULLSCREEN_FLAG,

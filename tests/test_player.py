@@ -507,7 +507,8 @@ def test_mpv_spawn_arguments_disable_watch_later_and_disk_cache() -> None:
     assert "--cache-on-disk=no" in arguments
     assert f"--input-ipc-server={socket_path}" in arguments
     assert "--vo=drm" in arguments
-    assert "--hwdec=auto-safe" in arguments
+    assert "--hwdec=v4l2m2m-copy" in arguments
+    assert "--framedrop=vo" in arguments
     assert "--msg-level=all=error" in arguments
 
 
