@@ -32,6 +32,7 @@ DOWNLOAD_BASE = f"https://archive.org/download/{IDENTIFIER}"
 USER_AGENT = "tv90-kipper-download/1.0 (personal library; +https://archive.org)"
 CHUNK_SIZE = 1024 * 1024
 BROADCAST_NAME = re.compile(r"^S(\d{2})E(\d{2}).*\.mp4$", re.IGNORECASE)
+SKIP_REMOTE_SUBSTRINGS = ("sprout version",)
 SUCCESS_EXIT_CODE = 0
 FAILURE_EXIT_CODE = 1
 
@@ -130,6 +131,9 @@ def list_original_episodes() -> tuple[RemoteEpisode, ...]:
         if dest_name is None:
             print(f"skip unrecognized name: {name}", file=sys.stderr)
             continue
+        if _is_skipped_variant(name):
+            print(f"skip alternate version: {name}", file=sys.stderr)
+            continue
         if dest_name in seen_dest:
             raise DownloadError(f"duplicate destination name {dest_name}")
         try:
@@ -150,6 +154,11 @@ def _is_original_mpeg4(file_info: dict[object, object]) -> bool:
     if name.lower().endswith(".ia.mp4"):
         return False
     return file_info.get("source") == "original" and file_info.get("format") == "MPEG4"
+
+
+def _is_skipped_variant(remote_name: str) -> bool:
+    lowered = remote_name.lower()
+    return any(marker in lowered for marker in SKIP_REMOTE_SUBSTRINGS)
 
 
 def _library_filename(remote_name: str) -> str | None:
