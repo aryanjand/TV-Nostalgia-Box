@@ -14,6 +14,8 @@ Mornings tend to be morning-tagged episodes, evenings night-tagged, midday ordin
 
 ## First install on the Pi
 
+Follow **First-time setup** in `README.md` for the first flash, SSH, and `sudo ./setup.sh`. The short version is below.
+
 You need a Raspberry Pi 4, a microSD card, an HDMI cable to the TV, and the official USB-C power supply.
 
 1. Install Raspberry Pi OS Bookworm on the card and boot the Pi once so it can finish first-run setup.

@@ -7,6 +7,7 @@ import socket
 import subprocess
 import time
 from collections.abc import Callable, Mapping
+from pathlib import Path
 from typing import Protocol
 
 from tv90.config import CALM_SLATE_COLOR, Settings
@@ -38,6 +39,14 @@ MPV_KEEP_OPEN_OFF_FLAG = "--keep-open=no"
 MPV_INPUT_IPC_SERVER_PREFIX = "--input-ipc-server="
 MPV_OSD_COLOR_PREFIX = "--osd-color="
 MPV_OSD_FONT_PREFIX = "--osd-font="
+MPV_AUDIO_DEVICE_PREFIX = "--audio-device="
+DRM_CLASS_PATH = Path("/sys/class/drm")
+HDMI_CONNECTOR_AUDIO_DEVICES = (
+    ("HDMI-A-1", "alsa/hdmi:CARD=vc4hdmi0,DEV=0"),
+    ("HDMI-A-2", "alsa/hdmi:CARD=vc4hdmi1,DEV=0"),
+)
+DEFAULT_HDMI_AUDIO_DEVICE = HDMI_CONNECTOR_AUDIO_DEVICES[0][1]
+DRM_CONNECTED_STATUS = "connected"
 
 OSD_FONT_NAME = "monospace"
 MPV_PERCENT_VOLUME_SCALE = 100.0
@@ -390,7 +399,34 @@ def ass_bgr_from_hex(hex_color: str) -> str:
     )
 
 
-def mpv_spawn_arguments(socket_path: str, settings: Settings) -> tuple[str, ...]:
+def connected_hdmi_audio_device(drm_path: Path = DRM_CLASS_PATH) -> str:
+    """Pick the ALSA HDMI device for the plug that has a TV, not the 3.5mm jack."""
+    try:
+        entries = tuple(drm_path.iterdir())
+    except OSError:
+        return DEFAULT_HDMI_AUDIO_DEVICE
+    for connector, device in HDMI_CONNECTOR_AUDIO_DEVICES:
+        suffix = f"-{connector}"
+        for entry in entries:
+            if not entry.name.endswith(suffix):
+                continue
+            try:
+                status = (entry / "status").read_text(encoding="utf-8").strip()
+            except OSError:
+                continue
+            if status == DRM_CONNECTED_STATUS:
+                return device
+    return DEFAULT_HDMI_AUDIO_DEVICE
+
+
+def mpv_spawn_arguments(
+    socket_path: str,
+    settings: Settings,
+    audio_device: str | None = None,
+) -> tuple[str, ...]:
+    device = (
+        audio_device if audio_device is not None else connected_hdmi_audio_device()
+    )
     return (
         MPV_BINARY,
         MPV_NO_CONFIG_FLAG,
@@ -410,6 +446,7 @@ def mpv_spawn_arguments(socket_path: str, settings: Settings) -> tuple[str, ...]
         MPV_KEEP_OPEN_OFF_FLAG,
         f"{MPV_OSD_COLOR_PREFIX}{settings.osd_color}",
         f"{MPV_OSD_FONT_PREFIX}{OSD_FONT_NAME}",
+        f"{MPV_AUDIO_DEVICE_PREFIX}{device}",
     )
 
 

@@ -27,6 +27,8 @@ LIBRARY_RW_SOURCE="${SCRIPT_DIR}/scripts/tv90-apply-library-mount"
 LIBRARY_RW_DEST="/usr/local/bin/tv90-apply-library-mount"
 LIBRARY_RW_UNIT_SOURCE="${SCRIPT_DIR}/packaging/90stv-library-rw.service"
 LIBRARY_RW_UNIT_DEST="/etc/systemd/system/90stv-library-rw.service"
+KIOSK_TTY_UNIT_SOURCE="${SCRIPT_DIR}/packaging/90stv-kiosk-tty.service"
+KIOSK_TTY_UNIT_DEST="/etc/systemd/system/90stv-kiosk-tty.service"
 OVERLAYROOT_LOCAL="/etc/overlayroot.local.conf"
 # recurse=0 keeps /srv/90stv/library remountable; Bookworm default recurse=1 overlays every mount.
 OVERLAYROOT_LINE='overlayroot="tmpfs:recurse=0"'
@@ -317,6 +319,45 @@ ensure_journald() {
   fi
 }
 
+hdmi_alsa_card() {
+  local connector card status
+  for connector in HDMI-A-1 HDMI-A-2; do
+    status="$(cat /sys/class/drm/*-"${connector}"/status 2>/dev/null | head -n 1 || true)"
+    if [[ "${status}" == "connected" ]]; then
+      if [[ "${connector}" == "HDMI-A-2" ]]; then
+        printf '%s\n' "vc4hdmi1"
+      else
+        printf '%s\n' "vc4hdmi0"
+      fi
+      return 0
+    fi
+  done
+  printf '%s\n' "vc4hdmi0"
+}
+
+ensure_hdmi_audio() {
+  # ALSA card 0 is the 3.5mm jack. Video is on HDMI, so default sound must be HDMI.
+  local card
+  card="$(hdmi_alsa_card)"
+  cat > /etc/asound.conf <<EOF
+pcm.!default {
+  type plug
+  slave.pcm "hdmi:CARD=${card},DEV=0"
+}
+ctl.!default {
+  type hw
+  card ${card}
+}
+EOF
+  if [[ -d /media/root-ro/etc ]]; then
+    if mount -o remount,rw /media/root-ro; then
+      install -m 644 /etc/asound.conf /media/root-ro/etc/asound.conf
+      mount -o remount,ro /media/root-ro || true
+    fi
+  fi
+  log "audio: ALSA default is HDMI (${card}), not the headphone jack"
+}
+
 ensure_kiosk() {
   if [[ "${IS_PI}" -ne 1 ]]; then
     log "skip kiosk: not a Raspberry Pi (systemd + mpv --force-window --fullscreen is the kiosk)"
@@ -326,14 +367,66 @@ ensure_kiosk() {
     return 0
   fi
   # Headless: no desktop/cursor fallback. mpv fullscreen is the picture.
+  ensure_hdmi_audio
   systemctl set-default multi-user.target
   local dm
-  for dm in lightdm gdm3 sddm; do
+  for dm in lightdm gdm3 sddm greetd; do
     if systemctl list-unit-files "${dm}.service" >/dev/null 2>&1; then
       systemctl disable "${dm}.service" >/dev/null 2>&1 || true
       systemctl stop "${dm}.service" >/dev/null 2>&1 || true
     fi
   done
+  # getty-generator always starts a login on tty1. That TTY hangup makes
+  # 90stv.service start and immediately deactivate in a loop. Overlay can
+  # discard a persistent /etc mask, so also install a boot oneshot that
+  # applies a /run mask before getty starts.
+  install -m 644 "${KIOSK_TTY_UNIT_SOURCE}" "${KIOSK_TTY_UNIT_DEST}"
+  systemctl daemon-reload
+  systemctl enable 90stv-kiosk-tty.service
+  systemctl mask getty@tty1.service >/dev/null 2>&1 || true
+  systemctl mask autovt@tty1.service >/dev/null 2>&1 || true
+  systemctl stop getty@tty1.service >/dev/null 2>&1 || true
+  systemctl stop autovt@tty1.service >/dev/null 2>&1 || true
+  persist_kiosk_on_real_root
+}
+
+persist_kiosk_on_real_root() {
+  local dest_dir="/media/root-ro/etc/systemd/system"
+  if [[ ! -d "${dest_dir}" ]]; then
+    return 0
+  fi
+  if ! mount -o remount,rw /media/root-ro; then
+    log "skip kiosk persist: could not remount /media/root-ro read-write"
+    return 0
+  fi
+  install -m 644 "${KIOSK_TTY_UNIT_SOURCE}" "${dest_dir}/90stv-kiosk-tty.service"
+  mkdir -p "${dest_dir}/multi-user.target.wants"
+  ln -sfn /etc/systemd/system/90stv-kiosk-tty.service \
+    "${dest_dir}/multi-user.target.wants/90stv-kiosk-tty.service"
+  ln -sfn /dev/null "${dest_dir}/getty@tty1.service"
+  ln -sfn /dev/null "${dest_dir}/autovt@tty1.service"
+  mount -o remount,ro /media/root-ro || true
+  log "kiosk: persisted getty mask under overlay (/media/root-ro)"
+}
+
+start_tv_service() {
+  if [[ "${IS_ROOT}" -ne 1 || "${IS_PI}" -ne 1 ]]; then
+    return 0
+  fi
+  if ! have_cmd systemctl; then
+    return 0
+  fi
+  if [[ -e "${LIBRARY_PATH}/.tv90-maintenance" ]]; then
+    log "skip start: maintenance flag present"
+    return 0
+  fi
+  systemctl reset-failed 90stv.service >/dev/null 2>&1 || true
+  systemctl start 90stv.service || true
+  if systemctl is-active --quiet 90stv.service; then
+    log "90stv.service is running — the TV should show a calm green slate, not a login"
+  else
+    log "90stv.service did not stay up; from a laptop run: journalctl -u 90stv.service -n 50"
+  fi
 }
 
 raspi_config_nonint() {
@@ -672,6 +765,18 @@ health_check() {
       log "health: missing enabled 90stv.service"
       ready=0
     fi
+    if have_cmd systemctl && systemctl is-enabled 90stv-kiosk-tty.service >/dev/null 2>&1; then
+      log "health: 90stv-kiosk-tty.service enabled"
+    else
+      log "health: missing enabled 90stv-kiosk-tty.service"
+      ready=0
+    fi
+    if have_cmd systemctl && systemctl is-active --quiet getty@tty1.service; then
+      log "health: missing masked getty@tty1 (login still active)"
+      ready=0
+    else
+      log "health: getty@tty1 inactive"
+    fi
   fi
 
   show_hits="$(count_health_hits)"
@@ -697,8 +802,12 @@ print_next_steps() {
   python="$(resolve_python)" || python="python3"
   if [[ "${IS_ROOT}" -eq 1 ]]; then
     log "setup complete: hostname ${HOSTNAME_VALUE}, library ${LIBRARY_PATH}, interstitials ${INTERSTITIALS_PATH}, user ${TV90_USER}"
-    if [[ "${IS_PI}" -eq 1 && "${OVERLAY_REBOOT_NEEDED}" -eq 1 ]]; then
-      log "next step: reboot so overlayroot takes effect, then confirm with sudo tv90-maintenance status"
+    if [[ "${IS_PI}" -eq 1 ]]; then
+      log "the TV should show a calm green slate — not a desktop, cursor, or 90stv login:"
+      log "phone remote: http://90stv.local:5000  then tap CHANNEL UP"
+      if [[ "${OVERLAY_REBOOT_NEEDED}" -eq 1 ]]; then
+        log "next step: sudo reboot so overlayroot takes effect, then confirm with sudo tv90-maintenance status"
+      fi
     fi
   else
     log "laptop setup complete (no systemd/hostname/overlay)"
@@ -737,6 +846,11 @@ main() {
   parse_args "$@"
   detect_mode
   configure_paths
+  if [[ "${IS_PI}" -eq 1 && "${IS_ROOT}" -ne 1 ]]; then
+    log "This is a Raspberry Pi. Run: sudo ./setup.sh"
+    log "Without sudo, files download here but the TV service is not installed and the screen stays on a login."
+    exit 1
+  fi
   if [[ "${IS_ROOT}" -eq 1 ]]; then
     if [[ "${IS_PI}" -eq 1 ]]; then
       log "mode: Pi root"
@@ -763,6 +877,7 @@ main() {
     fi
   fi
   print_next_steps
+  start_tv_service
   health_check
 }
 

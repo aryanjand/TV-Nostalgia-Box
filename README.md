@@ -1,5 +1,92 @@
 # 90s Cable TV Nostalgia Box: Final Project Requirements Document
 
+## First-time setup (Raspberry Pi)
+
+Do this from a laptop on the same Wi-Fi. You only type on the TV if SSH will not connect.
+
+**What you need**
+
+* Raspberry Pi 4, 32GB+ microSD card, HDMI cable to the TV, official USB-C power supply
+* Home Wi-Fi
+* Raspberry Pi Imager on your computer ([raspberrypi.com/software](https://www.raspberrypi.com/software/))
+
+**1. Flash the card**
+
+1. Open Raspberry Pi Imager.
+2. Choose your Pi, then **Raspberry Pi OS Lite (64-bit)**. The desktop is not needed.
+3. Open settings (the gear) and set:
+   * a username and password (remember them — this is how you log in)
+   * **Enable SSH**
+   * your Wi-Fi name and password
+4. Write the image. Put the card in the Pi.
+
+**2. First boot**
+
+1. Plug HDMI into the TV, then plug in power.
+2. Wait 2–3 minutes. A login prompt on the TV is **normal this one time**.
+3. Do not log in on the TV. Use your laptop for the next steps.
+
+**3. Log in from your laptop**
+
+```bash
+ssh YOURUSERNAME@raspberrypi.local
+```
+
+Use the username you set in Imager. If that hostname does not work, look up the Pi’s IP in your router and run `ssh YOURUSERNAME@192.168.x.x`.
+
+**4. Install the box**
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git
+git clone https://github.com/aryanjand/TV-Nostalgia-Box.git
+cd TV-Nostalgia-Box
+sudo ./setup.sh
+```
+
+You **must** use `sudo`. Without it, shows may download but the TV will not start and the screen stays on a login. Downloads need the internet and can take a long time. Leave the command running until it finishes.
+
+**5. Reboot**
+
+If the script says a reboot is needed, run:
+
+```bash
+sudo reboot
+```
+
+If it does not say that, reboot once anyway so the TV takes the screen:
+
+```bash
+sudo reboot
+```
+
+**6. After the reboot (final check)**
+
+1. The TV shows a **calm muted green screen**. That is the idle slate. It is working.
+2. You should **not** see a desktop, a mouse cursor, or `90stv login:`.
+3. On your phone (same Wi-Fi) open [http://90stv.local:5000](http://90stv.local:5000).
+4. Tap **CHANNEL UP**. A show should start.
+5. Sound comes from the TV speakers. Turn the TV volume up. The box sends audio over HDMI, not the headphone jack.
+
+`tv90` is the service account. It cannot log in. Always use the username you set in Imager.
+
+**If the TV still shows a login after setup**
+
+From your laptop:
+
+```bash
+ssh YOURUSERNAME@90stv.local
+cd TV-Nostalgia-Box
+sudo ./setup.sh --skip-media
+sudo reboot
+```
+
+Then check the TV again. Optional: `sudo tv90-maintenance status` should print `tv mode`.
+
+Household day-to-day steps (maintenance, adding episodes, settings) are in `docs/OPERATIONS.md`.
+
+---
+
 ### Design North Star
 
 Unlike YouTube or Netflix, this box is not engineered for watch time, click-through, or a dopamine loop. It is a **safe, passive routine** for a 2-year-old: cognitive calm, developmental consistency, and stress-free entertainment. Script and library architecture must prioritize the following over engagement metrics.

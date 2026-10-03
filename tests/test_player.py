@@ -31,6 +31,7 @@ from tv90.adapters.mpv_ipc_player import (
     MpvIpcSession,
     ass_bgr_from_hex,
     connect_mpv_unix_socket,
+    connected_hdmi_audio_device,
     decode_mpv_ipc_response,
     encode_mpv_ipc_payload,
     mpv_spawn_arguments,
@@ -531,7 +532,11 @@ def test_mpv_osd_overlay_uses_named_command_object() -> None:
 
 def test_mpv_spawn_arguments_disable_watch_later_and_disk_cache() -> None:
     socket_path = "/run/tv90/mpv.sock"
-    arguments = mpv_spawn_arguments(socket_path, load_settings({}))
+    arguments = mpv_spawn_arguments(
+        socket_path,
+        load_settings({}),
+        audio_device="alsa/hdmi:CARD=vc4hdmi0,DEV=0",
+    )
 
     assert arguments[0] == "mpv"
     assert "--no-config" in arguments
@@ -544,6 +549,26 @@ def test_mpv_spawn_arguments_disable_watch_later_and_disk_cache() -> None:
     assert "--hwdec=v4l2m2m-copy" in arguments
     assert "--framedrop=vo" in arguments
     assert "--msg-level=all=error" in arguments
+    assert "--audio-device=alsa/hdmi:CARD=vc4hdmi0,DEV=0" in arguments
+
+
+def test_connected_hdmi_audio_device_prefers_the_live_port(tmp_path: Path) -> None:
+    first = tmp_path / "card1-HDMI-A-1"
+    second = tmp_path / "card1-HDMI-A-2"
+    first.mkdir()
+    second.mkdir()
+    (first / "status").write_text("disconnected\n", encoding="utf-8")
+    (second / "status").write_text("connected\n", encoding="utf-8")
+
+    assert (
+        connected_hdmi_audio_device(tmp_path) == "alsa/hdmi:CARD=vc4hdmi1,DEV=0"
+    )
+
+
+def test_connected_hdmi_audio_device_defaults_to_hdmi0(tmp_path: Path) -> None:
+    assert (
+        connected_hdmi_audio_device(tmp_path) == "alsa/hdmi:CARD=vc4hdmi0,DEV=0"
+    )
 
 
 def test_mpv_observes_eof_reached_on_construction() -> None:

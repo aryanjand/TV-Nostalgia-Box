@@ -1,0 +1,11 @@
+[Unit]
+Description=Mask tty1 getty so 90stv can own the HDMI console
+Before=getty@tty1.service autovt@tty1.service 90stv.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/systemctl mask --runtime --now getty@tty1.service autovt@tty1.service
+
+[Install]
+WantedBy=multi-user.target

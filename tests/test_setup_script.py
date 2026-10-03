@@ -113,9 +113,38 @@ def test_setup_script_is_resilient_about_existing_disk_network_health() -> None:
     assert "skip overlay until" in SETUP_SCRIPT
 
 
+def test_setup_script_masks_tty1_getty_for_kiosk() -> None:
+    assert "mask getty@tty1.service" in SETUP_SCRIPT
+    assert "mask autovt@tty1.service" in SETUP_SCRIPT
+    assert "stop getty@tty1.service" in SETUP_SCRIPT
+    assert "90stv-kiosk-tty.service" in SETUP_SCRIPT
+    assert "persist_kiosk_on_real_root" in SETUP_SCRIPT
+    assert "/media/root-ro" in SETUP_SCRIPT
+    assert "This is a Raspberry Pi. Run: sudo ./setup.sh" in SETUP_SCRIPT
+    assert "ensure_hdmi_audio" in SETUP_SCRIPT
+    assert "hdmi:CARD=" in SETUP_SCRIPT
+    assert "start_tv_service" in SETUP_SCRIPT
+    kiosk_tty = (REPO / "packaging" / "90stv-kiosk-tty.service").read_text(
+        encoding="utf-8"
+    )
+    assert "mask --runtime --now getty@tty1.service" in kiosk_tty
+    assert "Before=getty@tty1.service" in kiosk_tty
+
+
+def test_readme_has_first_time_pi_steps() -> None:
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    assert "## First-time setup (Raspberry Pi)" in readme
+    assert "sudo ./setup.sh" in readme
+    assert "90stv.local:5000" in readme
+    assert "calm muted green" in readme
+    assert "90stv login:" in readme
+    assert "After the reboot" in readme
+
+
 def test_unit_file_restarts_always_and_logs_to_journal() -> None:
     assert "Restart=always" in UNIT_FILE
-    assert "After=network-online.target sound.target" in UNIT_FILE
+    assert "After=network-online.target sound.target 90stv-kiosk-tty.service" in UNIT_FILE
+    assert "Wants=network-online.target 90stv-kiosk-tty.service" in UNIT_FILE
     assert "User=tv90" in UNIT_FILE
     assert "Environment=TV90_LIBRARY_PATH=/srv/90stv/library" in UNIT_FILE
     assert "Environment=TV90_INTERSTITIALS_PATH=/srv/90stv/interstitials" in UNIT_FILE
